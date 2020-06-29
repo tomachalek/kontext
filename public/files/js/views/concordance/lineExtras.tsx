@@ -134,7 +134,7 @@ export function init(dispatcher:IActionDispatcher, he:Kontext.ComponentHelpers, 
             dispatcher.dispatch<Actions.SelectLine>({
                 name: ActionName.SelectLine,
                 payload: {
-                    value: event.currentTarget.checked ? 1 : null,
+                    value: event.currentTarget.checked ? null : 1,
                     tokenNumber: props.tokenNumber,
                     kwicLength: props.kwicLength
                 }

@@ -16,7 +16,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { Dict, List, pipe, tuple } from 'cnc-tskit';
+import { Dict, List, pipe, tuple, Ident } from 'cnc-tskit';
 
 import { LineSelections, LineSelectionModes } from './common';
 
@@ -41,7 +41,7 @@ export class ConcLinesStorage {
 
     private state:StorageUsingState; // we expect mutable state here (see LineSelectionModel)
 
-    private queryId:number;
+    private queryId:string;
 
     errorHandler:any; // TODO type
 
@@ -53,7 +53,8 @@ export class ConcLinesStorage {
     }
 
     init(state:StorageUsingState, query:Array<string>):void {
-        this.queryId = this.queryChecksum(query.join(''));
+        this.state = state; // !! here we rely on StatefulModel
+        this.queryId = Ident.hashCode(query.join(''));
         if (this.state.data[queryKey] && this.state.data[queryKey][0] !== this.queryId) {
             this.clear();
         }
@@ -81,7 +82,8 @@ export class ConcLinesStorage {
      * @param kwiclen number of kwic words
      * @param category category number
      */
-    addLine(id:string, kwiclen:number, category:number):void {
+    addLine(id:string, kwiclen:number, category:number|null):void {
+        console.log('adding line id ', id, ', kwiclen: ', kwiclen, ', cat: ', category);
         this.state.data[id] = tuple(kwiclen, category);
     }
 
@@ -120,7 +122,7 @@ export class ConcLinesStorage {
 
     /**
      * Returns number of selected rows
-     *List.filter(([k,]) => k !== queryKey)
+     * List.filter(([k,]) => k !== queryKey)
      * @returns {number}
      */
     size():number {
@@ -168,21 +170,13 @@ export class ConcLinesStorage {
             window.sessionStorage[accessKey] = this.toJSON();
         } catch (e) {
             if (e.name === 'QUOTA_EXCEEDED_ERR') {
-                console.error('Failed to store selected concordance lines due to exceeded data limit.');
+                console.error(
+                    'Failed to store selected concordance lines due to exceeded data limit.');
                 if (typeof this.errorHandler === 'function') {
                     this.errorHandler.call(this, e);
                 }
             }
         }
-    }
-
-    private queryChecksum(q:string):number {
-        let cc = 0;
-        for(let i = 0; i < q.length; i += 1) {
-            cc = (cc << 5) - cc + q.charCodeAt(i);
-            cc &= cc;
-        }
-        return cc;
     }
 }
 

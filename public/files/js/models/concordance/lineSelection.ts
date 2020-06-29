@@ -141,12 +141,17 @@ export class LineSelectionModel extends StatefulModel<LineSelectionModelState> {
         this.clStorage = clStorage;
         this.onLeavePage = onLeavePage;
 
+        this.DEBUG_onActionMatch((a, m) => {
+            console.log('>> ', a.name, a.payload);
+        })
+
         this.addActionHandler<Actions.SelectLine>(
             ActionName.SelectLine,
             action => {
                 const val = action.payload.value;
                 if (this.validateGroupId(val)) {
                     this.selectLine(val, action.payload.tokenNumber, action.payload.kwicLength);
+                    console.log('emitting change...')
                     this.emitChange();
 
                 } else {
