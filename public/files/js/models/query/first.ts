@@ -712,7 +712,7 @@ export class FirstQueryFormModel extends QueryFormModel<FirstQueryFormModelState
                                     currDefaultAttrValues: data.curr_default_attr_values,
                                     currQmcaseValues: data.curr_qmcase_values,
                                     currPcqPosNegValues: data.curr_pcq_pos_neg_values,
-                                    currIncludeEmptyValues: data.curr_include_empty_values
+                                    currIncludeEmptyValues: data.curr_include_empty_values,
                                 }
                             );
                             state.tagBuilderSupport = data.tag_builder_support;

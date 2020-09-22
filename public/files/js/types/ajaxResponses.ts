@@ -144,7 +144,7 @@ export namespace AjaxResponse {
         filtpos:string;
         inclkwic:boolean;
         qmcase:boolean;
-        default_attr_value:string;
+        default_attr:string;
         tag_builder_support:boolean;
         lpos:string;
         within:boolean; // used when switching to an aligned corp without specific query (true)

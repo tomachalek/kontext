@@ -107,6 +107,7 @@ export interface FilterServerArgs extends ConcServerArgs {
     query:string;
     qmcase:boolean;
     within:boolean;
+    default_attr:string;
     type:'filterQueryArgs';
 }
 

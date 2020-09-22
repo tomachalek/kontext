@@ -542,6 +542,7 @@ export class FilterFormModel extends QueryFormModel<FilterFormModelState> {
                         this.changeState(state => {
                             state.queries[filterId] = data.query;
                             state.queryTypes[filterId] = data.query_type;
+                            state.defaultAttrValues[filterId] = data.default_attr;
                             state.maincorps[filterId] = data.maincorp;
                             state.pnFilterValues[filterId] = data.pnfilter;
                             state.filflValues[filterId] = data.filfl;
@@ -557,7 +558,6 @@ export class FilterFormModel extends QueryFormModel<FilterFormModelState> {
                             };
                             state.inclkwicValues[filterId] = data.inclkwic;
                             state.matchCaseValues[filterId] = data.qmcase;
-                            state.defaultAttrValues[filterId] = data.default_attr_value;
                             state.tagBuilderSupport[filterId] = data.tag_builder_support;
                             state.withinArgs[filterId] = data.within;
                             state.lposValues[filterId] = data.lpos;
@@ -597,6 +597,7 @@ export class FilterFormModel extends QueryFormModel<FilterFormModelState> {
             inclkwic: this.state.inclkwicValues[filterId] ? 1 : 0,
             within: this.state.withinArgs[filterId],
             qmcase: this.state.matchCaseValues[filterId],
+            default_attr: this.state.defaultAttrValues[filterId],
             ...this.pageModel.getConcArgs()
         }
     }

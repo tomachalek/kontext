@@ -504,7 +504,7 @@ export class ViewPage {
             currQueryTypes: fetchArgs<QueryType>(item => item.query_type),
             currQueries: fetchArgs<string>(item => item.query),
             currQmcaseValues: fetchArgs<boolean>(item => item.qmcase),
-            currDefaultAttrValues: fetchArgs<string>(item => item.default_attr_value),
+            currDefaultAttrValues: fetchArgs<string>(item => item.default_attr),
             currLposValues: fetchArgs<string>(item => item.lpos),
             currFilflVlaues: fetchArgs<'f'|'l'>(item => item.filfl),
             currFilfposValues: fetchArgs<string>(item => item.filfpos),

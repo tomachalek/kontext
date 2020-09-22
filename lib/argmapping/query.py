@@ -243,6 +243,7 @@ class FilterFormArgs(ConcFormArgs):
         self.inclkwic = data['inclkwic']
         self.qmcase = data['qmcase']
         self.within = data['within']
+        self.default_attr = data['default_attr']
 
     def _add_corpus_metadata(self):
         with plugins.runtime.TAGHELPER as th:
