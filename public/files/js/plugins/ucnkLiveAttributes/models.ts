@@ -25,7 +25,7 @@ import { pipe, List, Dict, tuple, HTTP } from 'cnc-tskit';
 
 import { TextTypes, Kontext } from '../../types/common';
 import { IPluginApi } from '../../types/plugins';
-import { SelectionFilterMap, SelectedTextTypes } from '../../models/textTypes/common';
+import { SelectionFilterMap } from '../../models/textTypes/common';
 import { Actions, ActionName } from './actions';
 import { Actions as TTActions, ActionName as TTActionName } from '../../models/textTypes/actions';
 import { Actions as QueryActions, ActionName as QueryActionName } from '../../models/query/actions';
@@ -73,6 +73,10 @@ export interface AlignedLangSelectionStep {
 
 export function isAlignedSelectionStep(v:TTSelectionStep|AlignedLangSelectionStep):v is AlignedLangSelectionStep {
     return Array.isArray(v['languages']);
+}
+
+function isEncodedSelectionType(sel:TextTypes.TTSelectionTypes):boolean {
+    return sel === 'regexp';
 }
 
 export interface LiveAttrsModelState {
@@ -458,13 +462,13 @@ export class LiveAttrsModel extends StatelessModel<LiveAttrsModelState> implemen
                             return tuple<string, SelectedValues|EncodedSelection>(
                                 attr,
                                 state.selectionTypes[attr] &&
-                                    TextTypes.isEncodedSelectionType(state.selectionTypes[attr][0]) ?
+                                    isEncodedSelectionType(state.selectionTypes[attr][0]) ?
                                 {
                                     decodedValue: state.selectionTypes[attr][1],
                                     type: 'encoded'
                                 } :
                                 {
-                                    selections: Array.isArray(sels) ? sels : [sels],
+                                    selections: Array.isArray(sels) ? sels : [sels.encoded],
                                     type: 'default'
                                 }
                             )
@@ -599,7 +603,13 @@ export class LiveAttrsModel extends StatelessModel<LiveAttrsModelState> implemen
         )
     }
 
-    private loadAutocompleteHint(state:LiveAttrsModelState, pattern:string, patternAttr:string, selections:SelectedTextTypes):Observable<ServerRefineResponse> {
+    private loadAutocompleteHint(
+        state:LiveAttrsModelState,
+        pattern:string,
+        patternAttr:string,
+        selections:TextTypes.ServerCheckedValues
+    ):Observable<ServerRefineResponse> {
+
         const aligned = pipe(
             state.alignedCorpora,
             List.filter(item=>item.selected),

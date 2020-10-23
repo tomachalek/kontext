@@ -27,7 +27,7 @@ import { TextTypes, Kontext } from '../../types/common';
 import { AjaxResponse } from '../../types/ajaxResponses';
 import { IPluginApi } from '../../types/plugins';
 import { TTSelOps } from './selectionOps';
-import { SelectedTextTypes, importInitialData, TTInitialData, SelectionFilterMap,
+import { importInitialData, TTInitialData, SelectionFilterMap,
     IntervalChar, WidgetView} from './common';
 import { Actions, ActionName } from './actions';
 import { IUnregistrable } from '../common/common';
@@ -109,7 +109,7 @@ export class TextTypesModel extends StatefulModel<TextTypesModelState>
 
 
     constructor(dispatcher:IFullActionControl, pluginApi:IPluginApi, data:TTInitialData,
-            selectedItems?:SelectedTextTypes) {
+            selectedItems?:TextTypes.ServerCheckedValues) {
         const attributes = importInitialData(data, selectedItems || {});
         super(
             dispatcher,
@@ -479,7 +479,7 @@ export class TextTypesModel extends StatefulModel<TextTypesModelState>
                 checkedItems,
                 Dict.forEach((checkedOfAttr, k) => {
                     const checkedOfAttrNorm = Array.isArray(checkedOfAttr) ?
-                             checkedOfAttr : [checkedOfAttr];
+                             checkedOfAttr : [checkedOfAttr.encoded];
                     const attrIdx = state.attributes.findIndex(
                         v => k === state.bibIdAttr ?
                             v.name === state.bibLabelAttr : v.name === k);
@@ -516,7 +516,7 @@ export class TextTypesModel extends StatefulModel<TextTypesModelState>
                                         ...item,
                                         value: item.ident in bibMapping ?
                                             bibMapping[item.ident] : item.value,
-                                        selected: checkedOfAttr.indexOf(item.value) > -1 ? true : false,
+                                        selected: checkedOfAttrNorm.indexOf(item.value) > -1 ? true : false,
                                         locked: false
                                     })
                                 );
@@ -550,7 +550,7 @@ export class TextTypesModel extends StatefulModel<TextTypesModelState>
                                 attr,
                                 item => ({
                                     ...item,
-                                    selected: checkedOfAttr.indexOf(item.value) > -1 ? true : false,
+                                    selected: checkedOfAttrNorm.indexOf(item.value) > -1 ? true : false,
                                     locked: false
                                 })
                             );
@@ -725,25 +725,31 @@ export class TextTypesModel extends StatefulModel<TextTypesModelState>
      * @deprecated use actions along with model.suspend()
      */
     exportSelections(lockedOnesOnly:boolean):TextTypes.ExportedSelection {
-        const ans = {};
-        this.state.attributes.forEach((attrSel:TextTypes.AnyTTSelection) => {
-            if (TTSelOps.hasUserChanges(attrSel)) {
-                if (attrSel.type === 'regexp' && attrSel.widget === 'days') {
-                    ans[attrSel.name] = attrSel.textFieldValue;
+        const ans:TextTypes.ExportedSelection = {};
+        List.forEach(
+            (attrSel:TextTypes.AnyTTSelection) => {
+                if (TTSelOps.hasUserChanges(attrSel)) {
+                    if (attrSel.type === 'regexp' && attrSel.widget === 'days') {
+                        ans[attrSel.name] = {
+                            encoded: attrSel.textFieldValue,
+                            decoded: attrSel.textFieldDecoded
+                        };
 
-                } else if (this.state.autoCompleteSupport) {
-                    ans[attrSel.name !== this.state.bibLabelAttr ?
-                        attrSel.name :
-                        this.state.bibIdAttr] = TTSelOps.exportSelections(attrSel, lockedOnesOnly);
+                    } else if (this.state.autoCompleteSupport) {
+                        ans[attrSel.name !== this.state.bibLabelAttr ?
+                            attrSel.name :
+                            this.state.bibIdAttr] = TTSelOps.exportSelections(attrSel, lockedOnesOnly);
 
-                } else if (attrSel.type === 'text') {
-                    ans[attrSel.name] = [attrSel.textFieldValue];
+                    } else if (attrSel.type === 'text') {
+                        ans[attrSel.name] = [attrSel.textFieldValue];
 
-                } else {
-                    ans[attrSel.name] = TTSelOps.exportSelections(attrSel, lockedOnesOnly);
+                    } else {
+                        ans[attrSel.name] = TTSelOps.exportSelections(attrSel, lockedOnesOnly);
+                    }
                 }
-            }
-        });
+            },
+            this.state.attributes
+        );
         return ans;
     }
 

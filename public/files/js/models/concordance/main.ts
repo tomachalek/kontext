@@ -1003,18 +1003,25 @@ export class ConcordanceModel extends StatefulModel<ConcordanceModelState>
         }
     }
 
+    /**
+     * @todo - BROKEN
+     * (https://github.com/czcorpus/kontext/issues/3441)
+     */
     private calculateAdHocIpm():Observable<number> {
         const selections = this.ttModel.exportSelections(false);
-        const args = new MultiDict();
-        args.set('corpname', this.state.baseCorpname);
+        const args = {};
+        args['corpname'] = this.state.baseCorpname;
         for (let p in selections) {
             const v = selections[p];
-            args.replace(`sca_${p}`, Array.isArray(v) ? v : [v]); // TODO this is completely broken !!!
+            args[`sca_${p}`] = v; // TODO this is completely broken !!!
         }
         return this.layoutModel.ajax$<AjaxResponse.WithinMaxHits>(
             HTTP.Method.POST,
             this.layoutModel.createActionUrl('ajax_get_within_max_hits'),
-            args
+            args,
+            {
+                contentType: 'application/json'
+            }
 
         ).pipe(
             tap((data) => {

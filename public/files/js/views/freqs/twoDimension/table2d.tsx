@@ -535,7 +535,7 @@ export function init(
     /**
      *
      */
-    const CTCell:React.SFC<CTCellProps> = (props) => {
+    const CTCell:React.FC<CTCellProps> = (props) => {
 
         const getValue = () => {
             if (isNonEmpty()) {
@@ -750,7 +750,7 @@ export function init(
      *
      * @param {*} props
      */
-    const CTFullDataTable:React.SFC<CTFullDataTableProps> = (props) => {
+    const CTFullDataTable:React.FC<CTFullDataTableProps> = (props) => {
         const labels1 = () => {
             return props.d1Labels.filter(x => x[1]).map(x => x[0]);
         };
@@ -799,17 +799,29 @@ export function init(
                         {'\u00a0'}
                         {he.translate('freq__ct_current_adhoc_subc_is')}:
                         {'\u00a0'}
-                        {Object.keys(props.concSelectedTextTypes).map(v => {
-                            const data = props.concSelectedTextTypes[v];
-                            const values = Array.isArray(data) ? data : [data];
-
-                            return (
-                                <span key={v}>
-                                    <strong>{v}</strong>
-                                    {' \u2208 {' + List.map<string|number, string>(v => `"${v}"`, values).join(', ') + '}'}
-                                </span>
-                            );
-                        })}
+                        {pipe(
+                            props.concSelectedTextTypes,
+                            Dict.keys(),
+                            List.map(
+                                v => {
+                                    const data = props.concSelectedTextTypes[v];
+                                    return (
+                                        <span key={v}>
+                                            <strong>{v}</strong>
+                                            {' \u2208 {'}
+                                            {Array.isArray(data) ?
+                                                List.map<string|number, string>(
+                                                    v => `"${v}"`,
+                                                    data
+                                                ).join(', ') :
+                                                data.decoded
+                                            }
+                                            {'}'}
+                                        </span>
+                                    );
+                                }
+                            )
+                        )}
                     </p>
                 );
             }

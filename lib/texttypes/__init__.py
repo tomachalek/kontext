@@ -52,18 +52,20 @@ class TextTypeCollector(object):
         """
         self._corp = corpus
         self._src_obj = src_obj
-        if type(src_obj) is dict:
-            self._attr_producer_fn = lambda o: o.keys()
-            self._access_fn = lambda o, att: o.get(att)
-        elif isinstance(src_obj, Request):
-            self._attr_producer_fn = lambda o: list(o.form.keys())
-            self._access_fn = lambda o, x: o.form.getlist(*(x,))
-        else:
-            raise ValueError('Invalid source object (must be either a dict or Request): %s' % (
-                             src_obj.__class__.__name__,))
+        if type(src_obj) is not dict:
+            raise ValueError('Invalid TextTypeCollector source object: {}'.format(src_obj.__class__.__name__,))
+
+    def _get_attr_names(self):
+        return self._src_obj.keys()
+
+    def _get_attr_values(self, attr):
+        val = self._src_obj.get(attr)
+        if type(val) is dict:
+            return val['encoded']
+        return val
 
     def get_attrmap(self):
-        return dict((a, self._access_fn(self._src_obj, a)) for a in self._attr_producer_fn(self._src_obj))
+        return dict((a, self._get_attr_values(a)) for a in self._get_attr_names())
 
     def get_query(self) -> List[Tuple[str, str]]:
         """
@@ -71,8 +73,7 @@ class TextTypeCollector(object):
         a list of tuples (struct, condition); strings are encoded to the encoding current
         corpus uses!
         """
-        scas = [(a, self._access_fn(self._src_obj, a))
-                for a in self._attr_producer_fn(self._src_obj)]
+        scas = [(a, self._get_attr_values(a)) for a in self._get_attr_names()]
         structs = collections.defaultdict(list)
         for sa, v in scas:
             s, a = sa.split('.')

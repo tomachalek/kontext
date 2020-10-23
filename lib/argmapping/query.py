@@ -12,7 +12,7 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 
-from typing import Dict, Any, List, Tuple, Optional
+from typing import Dict, Any, List, Tuple, Optional, Union
 
 import re
 import logging
@@ -156,7 +156,7 @@ class QueryFormArgs(ConcFormArgs):
         self.fc_pos_wsize = (-5, 5)
         self.fc_pos = []
 
-        self.selected_text_types: Dict[str, str] = {}
+        self.selected_text_types: Dict[str, Union[List[str], Dict[str, str]]] = {}
         # for bibliography structattr - maps from hidden ids to visible titles (this is optional)
         self.bib_mapping: Dict[str, str] = {}
 

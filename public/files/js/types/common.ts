@@ -654,7 +654,7 @@ export namespace TextTypes {
      *         attr_name_2 => [val2#1, val2#2,...]
      */
     export interface ServerCheckedValues {
-        [key:string]:Array<string>|string;
+        [key:string]:Array<string>|{encoded:string; decoded:string};
     }
 
     export interface BibMapping {
@@ -675,10 +675,6 @@ export namespace TextTypes {
     }
 
     export type TTSelectionTypes = 'full'|'text'|'regexp';
-
-    export function isEncodedSelectionType(sel:TTSelectionTypes):boolean {
-        return sel === 'regexp';
-    }
 
     export interface FullAttributeSelection {
         attrInfo:TextTypes.AttrInfo;
@@ -718,7 +714,7 @@ export namespace TextTypes {
     export type AnyTTSelection = TextInputAttributeSelection|FullAttributeSelection|
             RegexpAttributeSelection;
 
-    export type ExportedSelection = {[sca:string]:Array<string>|Array<number>|string};
+    export type ExportedSelection = {[sca:string]:Array<string>|Array<number>|{encoded:string; decoded:string}};
 
     /**
      *
