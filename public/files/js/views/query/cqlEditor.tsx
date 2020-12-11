@@ -328,6 +328,8 @@ export function init(dispatcher:IActionDispatcher, he:Kontext.ComponentHelpers,
             return (
                 <div>
                     <pre contentEditable={true}
+                                role="textbox"
+                                aria-label={he.translate('query__qt_advanced')}
                                 spellCheck={false}
                                 onInput={(evt) => this.handleInputChange()}
                                 onClick={this.handleEditorClick}

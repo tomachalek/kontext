@@ -233,7 +233,10 @@ export function init(
 
         render() {
             return (
-                <span className="simple-input" contentEditable={true}
+                <span className="simple-input"
+                        contentEditable={true}
+                        role="textbox"
+                        aria-label={he.translate('query__qt_simple')}
                         spellCheck={false}
                         ref={this.props.refObject}
                         onInput={this.handleInputChange}

@@ -370,6 +370,8 @@ export namespace CoreViews {
             checked?:boolean;
             disabled?:boolean;
             id?:string;
+            ariaLabel?:string;
+            ariaLabelledBy?:string;
         }
 
         export interface State {
