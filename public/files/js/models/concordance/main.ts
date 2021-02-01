@@ -152,6 +152,8 @@ export interface ConcordanceModelState {
 
     concSummary:ConcSummary;
 
+    concId:string;
+
     adHocIpm:number;
 
     fastAdHocIpm:boolean;
@@ -237,6 +239,7 @@ export class ConcordanceModel extends StatefulModel<ConcordanceModelState>
                 fastAdHocIpm: lineViewProps.FastAdHocIpm,
                 providesAdHocIpm,
                 concSummary: lineViewProps.concSummary,
+                concId: layoutModel.getConf<string>('concPersistenceOpId'),
                 baseViewAttr: lineViewProps.baseViewAttr,
                 lines: importLines(initialData, viewAttrs.indexOf(lineViewProps.baseViewAttr) - 1),
                 viewAttrs,
@@ -346,12 +349,16 @@ export class ConcordanceModel extends StatefulModel<ConcordanceModelState>
             }
         );
 
-        this.addActionHandler<Actions.ChangePage>(
+        this.addActionHandler<Actions.ChangePage, Actions.RevisitPage>(
             [
                 ActionName.ChangePage,
                 ActionName.RevisitPage
             ],
             action => {
+                console.log('------- REVISIT/CHANGE ------')
+                console.log('isRevisit? ',  Actions.isRevisitPage(action));
+                console.log('this.state.concId: ', this.state.concId);
+                console.log('action.payload.concId: ', action.payload['concId']);
                 forkJoin([
                     this.suspend({}, (action, syncData) => {
                         return action.name === ActionName.PublishStoredLineSelections ?
@@ -359,7 +366,9 @@ export class ConcordanceModel extends StatefulModel<ConcordanceModelState>
                     }).pipe(
                         map(v => (v as Actions.PublishStoredLineSelections).payload)
                     ),
-                    this.changePage(action.payload.action, action.payload.pageNum)
+                    Actions.isRevisitPage(action) && this.state.concId !== action.payload.concId ?
+                        this.loadConcPage(action.payload.concId) :
+                        this.changePage(action.payload.action, action.payload.pageNum)
 
                 ]).pipe(
                     tap(([wakePayload, change]) => {
@@ -389,7 +398,7 @@ export class ConcordanceModel extends StatefulModel<ConcordanceModelState>
                         null : syncData;
 
                 }).pipe(
-                    concatMap(v => this.reloadPage())
+                    concatMap(v => this.loadConcPage())
 
                 ).subscribe(
                     (data) => {
@@ -534,7 +543,7 @@ export class ConcordanceModel extends StatefulModel<ConcordanceModelState>
                         state.baseViewAttr = action.payload.baseViewAttr;
                         state.attrViewMode = action.payload.attrVmode;
                     });
-                    this.reloadPage().subscribe(
+                    this.loadConcPage().subscribe(
                         (data) => {
                             this.pushHistoryState(this.state.currentPage);
                             this.emitChange();
@@ -555,7 +564,7 @@ export class ConcordanceModel extends StatefulModel<ConcordanceModelState>
                         state.showLineNumbers = action.payload.showLineNumbers;
                         state.currentPage = 1;
                     });
-                    this.reloadPage().subscribe(
+                    this.loadConcPage().subscribe(
                         (data) => {
                             this.pushHistoryState(this.state.currentPage);
                             this.emitChange();
@@ -567,7 +576,7 @@ export class ConcordanceModel extends StatefulModel<ConcordanceModelState>
                 }
             }
         );
-        
+
         this.addActionHandler<Actions.SetLineSelectionMode>(
             ActionName.SetLineSelectionMode,
             action => {
@@ -605,7 +614,7 @@ export class ConcordanceModel extends StatefulModel<ConcordanceModelState>
             }
         );
 
-        this.addActionHandler<MainMenuActions.ShowSaveForm|Actions.ResultCloseSaveForm>(
+        this.addActionHandler<MainMenuActions.ShowSaveForm, Actions.ResultCloseSaveForm>(
             [MainMenuActionName.ShowSaveForm, ActionName.ResultCloseSaveForm],
             action => {
                 this.changeState(state => {
@@ -711,7 +720,7 @@ export class ConcordanceModel extends StatefulModel<ConcordanceModelState>
             ActionName.MarkLinesDone,
             action => {
                 if (!action.error) {
-                    this.reloadPage(action.payload.data.conc_persistence_op_id).subscribe(
+                    this.loadConcPage(action.payload.data.conc_persistence_op_id).subscribe(
                         (data) => {
                             this.changeState(state => {
                                 state.lineSelOptionsVisible = false;
@@ -817,6 +826,7 @@ export class ConcordanceModel extends StatefulModel<ConcordanceModelState>
 
     private pushHistoryState(pageNum:number):void {
         const args = this.layoutModel.exportConcArgs();
+        console.log('----> pushHistoryState: ', args);
         args.set('fromp', pageNum);
         this.layoutModel.getHistory().pushState(
             'view', args, { pagination: true, pageNum });
@@ -826,10 +836,14 @@ export class ConcordanceModel extends StatefulModel<ConcordanceModelState>
      * Reload data on current concordance page.
      * The returned promise passes URL argument matching
      * currently displayed data page.
+     *
+     * @param concId if non-empty then a specific concordance is loaded
      */
-    private reloadPage(concId?:string):Observable<ConcServerArgs> {
+    private loadConcPage(concId?:string):Observable<ConcServerArgs> {
         return this.changePage(
-            'customPage', this.state.currentPage, concId ? `~${concId}` : undefined);
+            'customPage',
+            this.state.currentPage,
+            concId ? `~${concId}` : undefined);
     }
 
     private pageIsInRange(num:number):boolean {
@@ -858,7 +872,7 @@ export class ConcordanceModel extends StatefulModel<ConcordanceModelState>
 
         const args = this.layoutModel.getConcArgs();
         args.fromp = pageNum;
-        args.format ='json';
+        args.format = 'json';
         if (concId) {
             args.q = concId;
         }
@@ -892,6 +906,7 @@ export class ConcordanceModel extends StatefulModel<ConcordanceModelState>
         state.unfinishedCalculation = !!data.running_calc;
         state.lineGroupIds = [];
         state.adHocIpm = -1;
+        state.concId = data.conc_persistence_op_id;
         state.concSummary = {
             concSize: data.concsize,
             fullSize: data.fullsize,

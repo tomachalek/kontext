@@ -379,6 +379,16 @@ export class QueryReplayModel extends QueryInfoModel<QueryReplayModelState> {
             }
         );
 
+        this.addActionHandler<Actions.SliceQueryChain>(
+            ActionName.SliceQueryChain,
+            (state, action) => {
+                state.currEncodedOperations = state.currEncodedOperations.slice(0, action.payload.operationIdx + 1);
+                state.lastOperationKey = action.payload.concId;
+                console.log('xxx: ', this.DEBUG_snapshot(state.replayOperations));
+                console.log('state.current: ', state.currentQueryOverview);
+            }
+        );
+
         this.addActionHandler<Actions.QuerySetStopAfterIdx>(
             ActionName.QuerySetStopAfterIdx,
             (state, action) => {
@@ -394,6 +404,36 @@ export class QueryReplayModel extends QueryInfoModel<QueryReplayModelState> {
                 state.currentQueryOverview = null;
             }
         );
+
+        this.addActionHandler<ConcActions.RevisitPage>(
+            ConcActionName.RevisitPage,
+            null,
+            (state, action, dispatch) => {
+                const args = this.pageModel.exportConcArgs();
+                args.set('q', '~' + state.lastOperationKey);
+                this.pageModel.ajax$<QueryPipelineResponse>(
+                    HTTP.Method.GET,
+                    this.pageModel.createActionUrl('load_query_pipeline'),
+                    args
+
+                ).subscribe(
+                    resp => {
+                        const operationIdx = pipe(
+                            resp.ops,
+                            List.zip(state.currEncodedOperations),
+                            List.findIndex(([op,]) => op.id === action.payload.concId)
+                        ); // TODO kind of a weak mapping here
+                        dispatch<Actions.SliceQueryChain>({
+                            name: ActionName.SliceQueryChain,
+                            payload: {
+                                operationIdx,
+                                concId: action.payload.concId
+                            }
+                        });
+                    }
+                )
+            }
+        )
     }
 
     private getActualCorpname():string {

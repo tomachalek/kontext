@@ -148,8 +148,13 @@ export namespace Actions {
     export interface RevisitPage extends Action<{
         action:string;
         pageNum:number;
+        concId?:string;
     }> {
         name:ActionName.RevisitPage;
+    }
+
+    export function isRevisitPage(a:Action):a is RevisitPage {
+        return a.name === ActionName.RevisitPage;
     }
 
     export interface AsyncCalculationUpdated extends Action<{

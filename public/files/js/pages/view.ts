@@ -225,16 +225,18 @@ export class ViewPage {
     private setupHistoryOnPopState():void {
         // register event to load lines via ajax in case user hits back
         this.layoutModel.getHistory().setOnPopState((event) => {
+            console.log('###### ON pop state: ', event.state)
             if (event.state) {
-                if (event.state['modalAction']) {
-                    this.layoutModel.dispatcher.dispatch(event.state['modalAction']);
+                if (event.state['onPopStateAction']) {
+                    this.layoutModel.dispatcher.dispatch(event.state['onPopStateAction']);
 
                 } else if (event.state['pagination']) {
                     this.layoutModel.dispatcher.dispatch<Actions.RevisitPage>({
                         name: ActionName.RevisitPage,
                         payload: {
                             action: 'customPage',
-                            pageNum: event.state['pageNum']
+                            pageNum: event.state['pageNum'],
+                            concId: event.state['concId']
                         }
                     });
                 }
@@ -261,9 +263,7 @@ export class ViewPage {
     }
 
     /**
-     * Ensures that view's URL is always reusable (which is not always
-     * guaranteed implicitly - e.g. in case the form was submitted via POST
-     * method).
+     * Ensures that view's URL is always reusable via concordance ID
      */
     private updateHistory():void {
         if (window.location.hash) {
@@ -274,18 +274,16 @@ export class ViewPage {
             }
         }
         const currAction = this.layoutModel.getConf<string>('currentAction');
+        console.log('update history, currAction: ', currAction);
         switch (currAction) {
-            case 'filter':
-            case 'sortx':
-            case 'shuffle':
-            case 'reduce':
             case 'quick_filter':
             case 'create_view': {
+                console.log('replace state of filter/sort/etc. with ', this.layoutModel.exportConcArgs());
                 this.layoutModel.getHistory().replaceState(
                     'view',
                     this.layoutModel.exportConcArgs(),
                     {
-                        modalAction: {
+                        onPopStateAction: {
                             name: QueryActionName.EditLastQueryOperation,
                             payload: {
                                 sourceId: this.layoutModel.exportConcArgs().head('q')
@@ -294,12 +292,17 @@ export class ViewPage {
                     },
                     window.document.title
                 );
-                this.layoutModel.getHistory().pushState(
+            }
+            break;
+            case 'view': {
+                console.log('... replace state for -view-: ', this.layoutModel.exportConcArgs())
+                this.layoutModel.getHistory().replaceState(
                     'view',
                     this.layoutModel.exportConcArgs(),
                     {
                         pagination: true,
-                        pageNum: this.viewModels.lineViewModel.getCurrentPage()
+                        pageNum: this.viewModels.lineViewModel.getCurrentPage(),
+                        concId: this.layoutModel.getConf<string>('concPersistenceOpId')
                     },
                     window.document.title
                 );
