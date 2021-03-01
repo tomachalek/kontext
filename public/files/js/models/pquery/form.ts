@@ -19,17 +19,18 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import { Dict, HTTP, List, tuple } from 'cnc-tskit';
+import { Dict, HTTP, List, pipe, tuple } from 'cnc-tskit';
 import { IActionDispatcher, StatelessModel } from 'kombo';
-import { Observable } from 'rxjs';
+import { forkJoin, Observable } from 'rxjs';
 import { PageModel } from '../../app/page';
 import { Actions, ActionName } from './actions';
 import { IUnregistrable } from '../common/common';
 import { Actions as GlobalActions, ActionName as GlobalActionName } from '../common/actions';
 import { Actions as QueryActions, ActionName as QueryActionName } from '../query/actions';
-import { NonQueryCorpusSelectionModel } from '../corpsel';
 import { AdvancedQuery } from '../query/query';
 import { Kontext } from '../../types/common';
+import { map } from 'rxjs/operators';
+import { PquerySubmitArgs } from './common';
 
 
 interface HTTPSubmitArgs {
@@ -40,6 +41,9 @@ interface HTTPSubmitResponse {
 
 }
 
+interface HTTPSaveQueryResponse {
+
+}
 
 export interface PqueryFormModelState {
     isBusy:boolean;
@@ -182,7 +186,7 @@ export class PqueryFormModel extends StatelessModel<PqueryFormModelState> implem
             ActionName.QueryChange,
             (state, action) => {
                 state.queries[action.payload.sourceId].query = action.payload.query;
-                state.queries[action.payload.sourceId].queryHtml = action.payload.query;                
+                state.queries[action.payload.sourceId].queryHtml = action.payload.query;
             }
         );
 
@@ -221,14 +225,51 @@ export class PqueryFormModel extends StatelessModel<PqueryFormModelState> implem
         return {};
     }
 
-    private submitForm(state:PqueryFormModelState):Observable<HTTPSubmitResponse> {
-        return this.layoutModel.ajax$<HTTPSubmitResponse>(
+    private submitSaveQuery(state:PqueryFormModelState):Observable<HTTPSaveQueryResponse> {
+        const args:PquerySubmitArgs = {
+            usesubcorp: state.usesubcorp,
+            min_freq: state.minFreq,
+            position: state.position,
+            attr: state.attr,
+            queries: pipe(
+                state.queries,
+                Dict.toEntries(),
+                List.map(
+                    ([,query]) => ({
+                        corpname: state.corpname,
+                        qtype: 'advanced',
+                        query: query.query,
+                        pcq_pos_neg: 'pos',
+                        include_empty: false,
+                        default_attr: query.default_attr
+                    })
+                )
+            )
+        };
+        return this.layoutModel.ajax$<HTTPSaveQueryResponse>(
             HTTP.Method.POST,
-            this.layoutModel.createActionUrl(
-                'pquery/submit',
-                [tuple('corpname', state.corpname), tuple('usesubcorp', state.usesubcorp)]
-            ),
-            {}
+            this.layoutModel.createActionUrl('pquery/save_query'),
+            args,
+            {contentType: 'application/json'}
+        );
+    }
+
+    private submitForm(state:PqueryFormModelState):Observable<HTTPSubmitResponse> {
+        return forkJoin([
+            this.submitSaveQuery(state),
+            this.layoutModel.ajax$<HTTPSubmitResponse>(
+                HTTP.Method.POST,
+                this.layoutModel.createActionUrl(
+                    'pquery/submit',
+                    [tuple('corpname', state.corpname), tuple('usesubcorp', state.usesubcorp)]
+                ),
+                {}
+            )
+
+        ]).pipe(
+            map(
+                ([respSave, respSubmit]) => respSubmit
+            )
         );
     }
 
