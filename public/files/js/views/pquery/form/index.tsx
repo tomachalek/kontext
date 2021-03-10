@@ -255,14 +255,7 @@ export function init({dispatcher, he, model}:PqueryFormViewsArgs):React.Componen
             <S.PqueryFormSection>
                 <props.corparchWidget />
                 <S.PqueryForm>
-                    {props.receivedResults ?
-                        <layoutViews.ExpandableArea initialExpanded={false} label={he.translate('pquery__query_form_hd')}>
-                            <fieldset>
-                                {_renderMainFieldset()}
-                            </fieldset>
-                        </layoutViews.ExpandableArea> :
-                        _renderMainFieldset()
-                    }
+                    {_renderMainFieldset()}
                 </S.PqueryForm>
             </S.PqueryFormSection>
         )

@@ -72,6 +72,8 @@ def _extract_freqs(freqs):
     Extract value and freq information out of complex freq. response data type
     """
     ans = []
+    import logging
+    logging.getLogger(__name__).warning('freqs: {}'.format(freqs))
     for item in freqs.get('freqs', [{'Items': []}])[0].get('Items'):
         ans.append((item['Word'][0]['n'], item['freq']))
     return ans

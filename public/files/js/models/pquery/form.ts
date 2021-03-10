@@ -34,20 +34,12 @@ import { ConcQueryResponse } from '../concordance/common';
 import { concatMap, map, tap } from 'rxjs/operators';
 import { ConcQueryArgs, QueryContextArgs } from '../query/common';
 import { AsyncTaskArgs, FreqIntersectionArgs, FreqIntersectionResponse, createSourceId,
-    PqueryFormModelState, PqueryFormArgs } from './common';
+    PqueryFormModelState } from './common';
 import { highlightSyntax, ParsedAttr } from '../query/cqleditor/parser';
 import { AttrHelper } from '../query/cqleditor/attrs';
 import { AlignTypes } from '../freqs/twoDimension/common';
 import { MultiDict } from '../../multidict';
 
-
-/**
- *
- */
-interface HTTPSaveQueryResponse {
-    query_id:string;
-    messages:Array<[string, string]>;
-}
 
 interface PqueryFormModelSwitchPreserve {
     queries:string;
@@ -93,30 +85,18 @@ export class PqueryFormModel extends StatefulModel<PqueryFormModelState> impleme
                     this.layoutModel.showMessage('error', validationErr);
                     return;
                 }
-                const prevQueryId = this.state.queryId;
                 this.changeState(state => {
                     state.isBusy = true;
                     state.concWait = Dict.map(v => 'running', state.concWait);
-                    state.queryId = undefined;
                 });
 
-                if (prevQueryId) {
-                    this.dispatchSideEffect<Actions.StatePushToHistory>({
-                        name: ActionName.StatePushToHistory,
-                        payload: {
-                            queryId: prevQueryId
-                        }
-                    });
-                }
-
                 this.submitForm(this.state).subscribe(
-                    ([queryId, task]) => {
+                    (task) => {
                         this.dispatchSideEffect<Actions.SubmitQueryDone>({
                             name: ActionName.SubmitQueryDone,
                             payload: {
                                 corpname: this.state.corpname,
                                 usesubcorp: this.state.usesubcorp,
-                                queryId,
                                 task
                             },
                         });
@@ -137,7 +117,6 @@ export class PqueryFormModel extends StatefulModel<PqueryFormModelState> impleme
             action => {
                 if (!action.error) {
                     this.changeState(state => {
-                        state.queryId = action.payload.queryId;
                         state.task = action.payload.task;
                     });
                 }
@@ -312,7 +291,7 @@ export class PqueryFormModel extends StatefulModel<PqueryFormModelState> impleme
                         });
                     }
                     if (this.state.task.status === 'SUCCESS') {
-                        this.layoutModel.ajax$<{result:{resultId:string; numLines:number;}}>(
+                        this.layoutModel.ajax$<{result:{queryId:string; numLines:number;}}>(
                             HTTP.Method.GET,
                             'get_task_result',
                             {task_id: this.state.task.ident}
@@ -322,7 +301,7 @@ export class PqueryFormModel extends StatefulModel<PqueryFormModelState> impleme
                                 this.dispatchSideEffect<Actions.AsyncResultRecieved>({
                                     name: ActionName.AsyncResultRecieved,
                                     payload: {
-                                        resultId: resp.result.resultId,
+                                        queryId: resp.result.queryId,
                                         numLines: resp.result.numLines
                                     }
                                 })
@@ -353,12 +332,18 @@ export class PqueryFormModel extends StatefulModel<PqueryFormModelState> impleme
                         this.layoutModel.showMessage('error', action.error);
 
                     } else {
-                        state.receivedResults = true;
+                        window.location.href = this.layoutModel.createActionUrl(
+                            'pquery/result',
+                            [
+                                tuple('corpname', state.corpname),
+                                tuple('usesubcorp', state.usesubcorp),
+                                tuple('query_id', action.payload.queryId)
+                            ]
+                        )
                     }
-                    state.concWait = Dict.map(v => 'none', state.concWait);
                 });
             }
-        )
+        );
 
         this.addActionHandler<Actions.ConcordanceReady>(
             ActionName.ConcordanceReady,
@@ -407,7 +392,6 @@ export class PqueryFormModel extends StatefulModel<PqueryFormModelState> impleme
         state.attrs = this.layoutModel.getConf('AttrList')
         state.structAttrs = this.layoutModel.getConf('StructAttrList')
         state.corpname = corpora[0][1]
-        state.receivedResults = false;
         if (data) {
             state.queries = Dict.map(v => {
                 v.corpname = state.corpname;
@@ -439,7 +423,7 @@ export class PqueryFormModel extends StatefulModel<PqueryFormModelState> impleme
         };
     }
 
-    private submitForm(state:PqueryFormModelState):Observable<[string, Kontext.AsyncTaskInfo<AsyncTaskArgs>]> {
+    private submitForm(state:PqueryFormModelState):Observable<Kontext.AsyncTaskInfo<AsyncTaskArgs>> {
         return forkJoin(pipe(
             state.queries,
             Dict.toEntries(),
@@ -466,23 +450,16 @@ export class PqueryFormModel extends StatefulModel<PqueryFormModelState> impleme
             )
         )).pipe(
             concatMap(
-                (concResponses) => {
-                    const concIds = List.map(
+                (concResponses) => this.submitFreqIntersection(
+                    state,
+                    List.map(
                         resp => resp.conc_persistence_op_id,
                         concResponses
-                    );
-                    return forkJoin([
-                        state.queryId ?
-                            rxOf(state.queryId) :
-                            this.saveQuery(state),
-                        this.submitFreqIntersection(
-                            state, concIds
-                        )
-                    ]);
-                }
+                    )
+                )
             ),
             tap(
-                ([,fiResponse]) => {
+                (fiResponse) => {
                     this.dispatchSideEffect<ACActions.InboxAddAsyncTask>({
                         name: ACActionName.InboxAddAsyncTask,
                         payload: fiResponse.task
@@ -490,17 +467,14 @@ export class PqueryFormModel extends StatefulModel<PqueryFormModelState> impleme
                 }
             ),
             map(
-                ([queryId, fiResponse]) => {
-                    return tuple(queryId,
-                        fiResponse.task as Kontext.AsyncTaskInfo<AsyncTaskArgs>) // TODO Type always OK?
-                }
+                (fiResponse) => fiResponse.task as Kontext.AsyncTaskInfo<AsyncTaskArgs>
             )
         );
     }
 
     private submitFreqIntersection(
         state:PqueryFormModelState,
-        concIds:Array<string>
+        concIds:Array<string>,
     ):Observable<FreqIntersectionResponse> {
 
         const args:FreqIntersectionArgs = {
@@ -509,6 +483,12 @@ export class PqueryFormModel extends StatefulModel<PqueryFormModelState> impleme
             conc_ids: concIds,
             min_freq: state.minFreq,
             attr: state.attr,
+            queries: pipe(
+                state.queries,
+                Dict.values()
+            ),
+            pos_index: state.posIndex,
+            pos_align: state.posAlign,
             position: this.getPosition(state)
         };
         return this.layoutModel.ajax$<FreqIntersectionResponse>(
@@ -519,43 +499,6 @@ export class PqueryFormModel extends StatefulModel<PqueryFormModelState> impleme
             ),
             args,
             {contentType: 'application/json'}
-        );
-    }
-
-    /**
-     * Save query and return a new ID of the query
-     */
-    private saveQuery(state:PqueryFormModelState):Observable<string> {
-        const args:PqueryFormArgs = {
-            corpname: state.corpname,
-            usesubcorp: state.usesubcorp,
-            min_freq: state.minFreq,
-            pos_index: state.posIndex,
-            pos_align: state.posAlign,
-            attr: state.attr,
-            queries: pipe(
-                state.queries,
-                Dict.toEntries(),
-                List.map(
-                    ([,query]) => ({
-                        corpname: state.corpname,
-                        qtype: 'advanced',
-                        query: query.query,
-                        pcq_pos_neg: 'pos',
-                        include_empty: false,
-                        default_attr: query.default_attr
-                    })
-                )
-            )
-        };
-        return this.layoutModel.ajax$<HTTPSaveQueryResponse>(
-            HTTP.Method.POST,
-            this.layoutModel.createActionUrl('pquery/save_query'),
-            args,
-            {contentType: 'application/json'}
-
-        ).pipe(
-            map(resp => resp.query_id)
         );
     }
 

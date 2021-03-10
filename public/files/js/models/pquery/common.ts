@@ -25,22 +25,6 @@ import { highlightSyntaxStatic } from '../query/cqleditor/parser';
 import { AlignTypes } from '../freqs/twoDimension/common';
 import { AdvancedQuery, AdvancedQuerySubmit } from '../query/query';
 
-/**
- * PqueryFormArgs represents paradigmatic query form values
- * as stored on server. Due to specific nature of the whole
- * calculation process, the type is not used directly
- * to start a calculation.
- */
-export interface PqueryFormArgs {
-    id?:string; // if undefined then the form is not serialized yet
-    corpname:string;
-    usesubcorp:string;
-    min_freq:number;
-    pos_index:number;
-    pos_align:AlignTypes;
-    attr:string;
-    queries:Array<AdvancedQuerySubmit>;
-}
 
 /**
  * PqueryResult is a result of a Paradigmatic query
@@ -54,11 +38,14 @@ export interface FreqIntersectionArgs {
     conc_ids:Array<string>;
     min_freq:number;
     attr:string;
+    pos_index:number;
+    pos_align:AlignTypes;
     position:string;
+    queries:Array<AdvancedQuerySubmit>;
 }
 
 export interface AsyncTaskArgs {
-    conc_id:string;
+    query_id:string;
     last_update:number;
 }
 
@@ -90,7 +77,6 @@ export interface PqueryFormModelState {
     cqlEditorMessages:{[sourceId:string]:string};
     useRichQueryEditor:boolean;
     concWait:{[sourceId:string]:ConcStatus};
-    queryId:string|undefined;
     task:Kontext.AsyncTaskInfo<AsyncTaskArgs>|undefined;
     minFreq:number;
     posIndex:number;
@@ -98,7 +84,6 @@ export interface PqueryFormModelState {
     attr:string;
     attrs:Array<Kontext.AttrItem>;
     structAttrs:Array<Kontext.AttrItem>;
-    receivedResults:boolean;
 }
 
 /**
@@ -160,19 +145,17 @@ export function newModelState(
             Dict.fromEntries()
         ),
         task: undefined,
-        queryId: undefined,
         minFreq: 5,
         posIndex: 6,
         posAlign: AlignTypes.LEFT,
         attr: defaultAttr,
         attrs,
-        structAttrs,
-        receivedResults: false
+        structAttrs
     };
 }
 
 export function storedQueryToModel(
-    sq:PqueryFormArgs,
+    sq:FreqIntersectionArgs,
     attrs:Array<Kontext.AttrItem>,
     structAttrs:Array<Kontext.AttrItem>,
     useRichQueryEditor:boolean
@@ -233,13 +216,11 @@ export function storedQueryToModel(
             Dict.fromEntries()
         ),
         task: undefined,
-        queryId: sq.id,
         minFreq: sq.min_freq,
         posIndex: sq.pos_index,
         posAlign: sq.pos_align,
         attr: sq.attr,
         attrs,
-        structAttrs,
-        receivedResults: false
+        structAttrs
     }
 }

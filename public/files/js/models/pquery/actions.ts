@@ -54,7 +54,6 @@ export namespace Actions {
     }
 
     export interface SubmitQueryDone extends Action<{
-        queryId:string;
         corpname:string;
         usesubcorp:string;
         task:Kontext.AsyncTaskInfo<AsyncTaskArgs>;
@@ -108,7 +107,7 @@ export namespace Actions {
     }
 
     export interface AsyncResultRecieved extends Action<{
-        resultId:string;
+        queryId:string;
         numLines:number;
     }> {
         name: ActionName.AsyncResultRecieved

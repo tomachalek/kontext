@@ -22,13 +22,13 @@
 import { PageModel } from '../app/page';
 import { KontextPage } from '../app/main';
 import { Kontext } from '../types/common';
-import { init as formViewInit } from '../views/pquery/form';
 import { PqueryFormModel } from '../models/pquery/form';
 import { PluginInterfaces } from '../types/plugins';
-import corplistComponent from 'plugins/corparch/init';
-import { Actions as GlobalActions, ActionName as GlobalActionName } from '../models/common/actions';
-import { tuple } from 'cnc-tskit';
+import { Actions, ActionName } from '../models/pquery/actions';
+import { PqueryResultModel } from '../models/pquery/result';
+import { init as resultViewInit } from '../views/pquery/result';
 import { init as queryOverviewInit } from '../views/pquery/overview';
+import { MultiDict } from '../multidict';
 import { FreqIntersectionArgs, newModelState, storedQueryToModel } from '../models/pquery/common';
 import { AttrHelper } from '../models/query/cqleditor/attrs';
 
@@ -46,27 +46,6 @@ class ParadigmaticQueryPage {
         this.layoutModel = layoutModel;
     }
 
-    private initCorplistComponent():[React.ComponentClass, PluginInterfaces.Corparch.IPlugin] {
-        const plg = corplistComponent(this.layoutModel.pluginApi());
-        return tuple(
-            plg.createWidget(
-                'query',
-                {
-                    itemClickAction: (corpora:Array<string>, subcorpId:string) => {
-                        this.layoutModel.dispatcher.dispatch<GlobalActions.SwitchCorpus>({
-                            name: GlobalActionName.SwitchCorpus,
-                            payload: {
-                                corpora,
-                                subcorpus: subcorpId
-                            }
-                        });
-                    }
-                }
-            ),
-            plg
-        );
-    }
-
     private initCorpnameLink(model:PqueryFormModel):void {
         const queryOverviewViews = queryOverviewInit(
             this.layoutModel.dispatcher,
@@ -78,7 +57,7 @@ class ParadigmaticQueryPage {
             window.document.getElementById('query-overview-mount'),
             {
                 currCorpus: this.layoutModel.getCorpusIdent(),
-                queryId: undefined
+                queryId: this.layoutModel.getConf<string>('QueryId')
             }
         );
     }
@@ -114,33 +93,74 @@ class ParadigmaticQueryPage {
                 attrHelper
             );
 
-            // qquery form
+            // pquery result
 
-            const formView = formViewInit({
+            const resultModel = new PqueryResultModel(
+                this.layoutModel.dispatcher,
+                {
+                    isBusy: false,
+                    data: [],
+                    queryId: this.layoutModel.getConf<string>('QueryId'),
+                    sortKey: {column: 'freq', reverse: true},
+                    resultId: undefined,
+                    numLines: undefined,
+                    page: 1,
+                    pageSize: 5
+                },
+                this.layoutModel
+            );
+
+            const resultView = resultViewInit({
                 dispatcher: this.layoutModel.dispatcher,
                 he: this.layoutModel.getComponentHelpers(),
-                model: formModel
-            });
-            const [corparchWidget, corparchPlg]  = this.initCorplistComponent();
+                model: resultModel
+            })
+
             this.layoutModel.renderReactComponent(
-                formView,
-                window.document.getElementById('pquery-form-mount'),
-                {
-                    corparchWidget
+                resultView,
+                window.document.getElementById('pquery-result-mount')
+            );
+
+            // history
+
+            this.layoutModel.dispatcher.registerActionListener(
+                (action, dispatch) => {
+                    const args = new MultiDict();
+                    if (Actions.isSubmitQueryDone(action)) {
+                        args.set('corpname', action.payload.corpname);
+                        args.set('usesubcorp', action.payload.usesubcorp);
+                        args.set('query_id', this.layoutModel.getConf<string>('QueryId'));
+                        this.layoutModel.getHistory().replaceState(
+                            'pquery/result',
+                            args,
+                            {},
+                            window.document.title
+                        );
+                    }
                 }
             );
 
-            // ---
+            this.layoutModel.getHistory().setOnPopState((event) => {
+                console.log('event state ', event.state);
+                if (event.state['onPopStateAction']) {
+                    this.layoutModel.dispatcher.dispatch(event.state['onPopStateAction']);
+                }
+            });
 
-            this.layoutModel.registerCorpusSwitchAwareModels(
-                () => {
-                    this.layoutModel.unmountReactComponent(
-                        window.document.getElementById('pquery-form-mount'));
-                    this.init();
-                },
-                formModel,
-                corparchPlg
-            );
+            // ----
+
+            if (storedForm) {
+                window.setTimeout(() => {
+                    this.layoutModel.dispatcher.dispatch<Actions.SubmitQuery>({
+                        name: ActionName.SubmitQuery
+                    })
+                });
+
+            } else {
+                this.layoutModel.showMessage(
+                    'error',
+                    this.layoutModel.translate('pquery__no_form_data_to_restore'))
+            }
 
             // ---
 

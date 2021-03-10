@@ -35,12 +35,13 @@ __conf.FormData = {{ form_data|to_json }};
 __conf.Tagsets = {{ tagsets|to_json }};
 __conf.DefaultAttr = {{ pquery_default_attr|to_json }};
 __conf.UseRichQueryEditor = {{ rich_query_editor|default(false)|to_json }};
-pqueryPage.init(__conf);
+__conf.QueryId = {{ query_id|to_json }};
+pqueryResultPage.init(__conf);
 {% endblock %}
 
 {% block main %}
 <section class="pquery">
     <div class="bar"><h2>{{ "Paradigmatic query"|_ }}</h2><span id="topbar-help-mount"></span></div>
-    <div id="pquery-form-mount"></div>
+    <div id="pquery-result-mount"></div>
 </section>
 {% endblock %}

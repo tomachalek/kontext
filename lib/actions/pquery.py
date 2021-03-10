@@ -74,22 +74,21 @@ class ParadigmaticQuery(Kontext):
         ans = {
             'corpname': self.args.corpname,
             'form_data': data,
-            'calculate': False,
             'tagsets': self._get_tagsets(),
             'pquery_default_attr': self._get_default_attr()
         }
         self._export_subcorpora_list(self.args.corpname, self.args.usesubcorp, ans)
         return ans
 
-    @exposed(template='pquery/index.html', http_method='GET', page_model='pquery')
+    @exposed(template='pquery/result.html', http_method='GET', page_model='pqueryResult')
     def result(self, request):
         data = self._init_page_data(request)
         ans = {
             'corpname': self.args.corpname,
             'form_data': data,
-            'calculate': True,
             'tagsets': self._get_tagsets(),
-            'pquery_default_attr': self._get_default_attr()
+            'pquery_default_attr': self._get_default_attr(),
+            'query_id': request.args.get('query_id')
         }
         self._export_subcorpora_list(self.args.corpname, self.args.usesubcorp, ans)
         return ans
@@ -104,6 +103,12 @@ class ParadigmaticQuery(Kontext):
         app = bgcalc.calc_backend_client(settings)
         corp_info = self.get_corpus_info(self.args.corpname)
 
+        args = PqueryFormArgs()
+        args.update_by_user_query(request.json)
+        with plugins.runtime.QUERY_HISTORY as qh, plugins.runtime.QUERY_PERSISTENCE as qp:
+            query_id = qp.store(user_id=self.session_get('user', 'id'), curr_data=args.to_dict())
+            qh.write(user_id=self.session_get('user', 'id'), query_id=query_id, qtype='pquery')
+
         raw_queries = dict()
         with plugins.runtime.QUERY_PERSISTENCE as query_persistence:
             for conc_id in request.json.get('conc_ids'):
@@ -116,7 +121,7 @@ class ParadigmaticQuery(Kontext):
             corp_info.collator_locale if corp_info.collator_locale else 'en_US')
         res = app.send_task('calc_merged_freqs', args=calc_args,
                             time_limit=TASK_TIME_LIMIT)
-        task_args = dict(conc_id=conc_id, last_update=time.time())
+        task_args = dict(query_id=query_id, last_update=time.time())
         async_task = AsyncTaskStatus(status=res.status, ident=res.id,
                                      category=AsyncTaskStatus.CATEGORY_PQUERY,
                                      label=translate('Paradigmatic query calculation'),
@@ -141,14 +146,6 @@ class ParadigmaticQuery(Kontext):
                 elif sort == 'value':
                     data = sorted([row for row in csv_reader], key=lambda x: x[0], reverse=reverse)
             return data[page_id*page_size:(page_id+1)*page_size]
-        
-        raise NotFoundException(f'Pquery calculation is lost')        
 
-    @exposed(http_method='POST', return_type='json', skip_corpus_init=True)
-    def save_query(self, request):
-        args = PqueryFormArgs()
-        args.update_by_user_query(request.json)
-        with plugins.runtime.QUERY_HISTORY as qh, plugins.runtime.QUERY_PERSISTENCE as qp:
-            query_id = qp.store(user_id=self.session_get('user', 'id'), curr_data=args.to_dict())
-            qh.write(user_id=self.session_get('user', 'id'), query_id=query_id, qtype='pquery')
-        return dict(ok=True, query_id=query_id)
+        raise NotFoundException(f'Pquery calculation is lost')
+
