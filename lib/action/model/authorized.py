@@ -130,7 +130,22 @@ class UserActionModel(BaseActionModel):
                 # avoided by 'continue' in case everything is OK
                 logging.getLogger('SCHEDULING').error('task_id: {}, Failed to invoke scheduled action: {}'.format(
                     action.get('id', '??'), action,))
+            # TODO inheritance issues
             self._save_options()  # this causes scheduled task to be removed from settings
+
+    def user_subc_names(self, corpname):
+        if self.user_is_anonymous():
+            return []
+        return self.cm.subcorp_names(corpname)
+
+    @staticmethod
+    def parse_sorting_param(k):
+        if k[0] == '-':
+            revers = True
+            k = k[1:]
+        else:
+            revers = False
+        return k, revers
 
     @property
     def plugin_ctx(self):
@@ -287,7 +302,7 @@ class UserActionModel(BaseActionModel):
                 if not at.error:
                     at.error = 'task time limit exceeded'
 
-    def _store_async_task(self, async_task_status) -> List[AsyncTaskStatus]:
+    def store_async_task(self, async_task_status) -> List[AsyncTaskStatus]:
         at_list = [t for t in self.get_async_tasks() if t.status != 'FAILURE']
         self._mark_timeouted_tasks(*at_list)
         at_list.append(async_task_status)

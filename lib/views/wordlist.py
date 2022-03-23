@@ -53,8 +53,7 @@ async def submit(amodel: WordlistActionModel, req: KRequest, resp: KResponse):
             'user', 'id'), amodel.corp, form_args.wlattr)
         if type(data_calc) is list:
             for subtask in data_calc:
-                # TODO get rid of private method
-                amodel._store_async_task(subtask)
+                amodel.store_async_task(subtask)
                 ans['subtasks'].append(subtask.to_dict())
             ans['freq_files_avail'] = False
         else:

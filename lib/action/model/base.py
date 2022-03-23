@@ -51,6 +51,7 @@ class BaseActionModel:
         self._system_messages: List[Tuple[str, str]] = []
         self._files_path: str = settings.get('global', 'static_files_prefix', '../files')
         self.disabled_menu_items: Tuple[str, ...] = ()
+        "TODO - this should be part of KResponse"
         # menu items - they should not be handled directly
         self._dynamic_menu_items: List[AbstractMenuItem] = []
         self._plugin_ctx: Optional[BasePluginCtx] = None
@@ -82,6 +83,8 @@ class BaseActionModel:
         arguments:
         msg_type -- one of 'message', 'info', 'warning', 'error'
         text -- text of the message
+
+        TODO - this should be part of response
         """
         self._system_messages.append((msg_type, text))
 

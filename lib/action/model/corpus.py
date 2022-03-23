@@ -249,11 +249,6 @@ class CorpusActionModel(UserActionModel):
                     raise UserActionException(self._req.translate('Invalid or expired query'))
         return False
 
-    def user_subc_names(self, corpname):
-        if self.user_is_anonymous():
-            return []
-        return self.cm.subcorp_names(corpname)
-
     async def _save_query_to_history(self, query_id: str, conc_data) -> Optional[int]:
         if conc_data.get('lastop_form', {}).get('form_type') in ('query', 'filter') and not self.user_is_anonymous():
             with plugins.runtime.QUERY_HISTORY as qh:
@@ -646,15 +641,6 @@ class CorpusActionModel(UserActionModel):
         stores user's persistent settings (but can be also passed via URL with some limitations).
         """
         return ','.join(x for x in (self.args.structs, ','.join(self.args.structattrs)) if x)
-
-    @staticmethod
-    def _parse_sorting_param(k):
-        if k[0] == '-':
-            revers = True
-            k = k[1:]
-        else:
-            revers = False
-        return k, revers
 
     async def get_tt_bib_mapping(self, tt_data):
         bib_mapping = {}
