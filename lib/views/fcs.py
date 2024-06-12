@@ -172,7 +172,7 @@ async def check_corpora(amodel: FCSActionModel, corpora: List[str]):
     with plugins.runtime.AUTH as auth:
         user_info = await auth.get_user_info(amodel.plugin_ctx)
         for corpname in corpora:
-            has_access, variant = await auth.validate_access(corpname, user_info)
+            has_access, variant = await auth.validate_access(amodel.plugin_ctx, corpname)
             if not has_access:
                 raise CorpusForbiddenException(corpname, variant)
 

@@ -77,6 +77,7 @@ from plugin_types.query_persistence.common import (
 from plugins import inject
 from plugins.common.mysql import MySQLConf, MySQLOps
 from plugins.mysql_integration_db import MySqlIntegrationDb
+from action.plugin.ctx import AbstractUserPluginCtx
 
 from .archive import get_iso_datetime, is_archived
 
@@ -145,31 +146,31 @@ class MySqlQueryPersistence(AbstractQueryPersistence):
             return self.anonymous_user_ttl
         return self._ttl_days
 
-    async def _find_used_corpora(self, query_id):
+    async def _find_used_corpora(self, plugin_ctx: AbstractUserPluginCtx, query_id):
         """
         Because the operations are chained via 'prev_id' and the corpname
         information is not stored for all the steps, for any n-th step > 1
         we have to go backwards and find an actual corpname stored in the
         1st operation.
         """
-        data = await self._load_query(query_id, save_access=False)
+        data = await self._load_query(plugin_ctx, query_id, save_access=False)
         while data is not None and 'corpname' not in data:
-            data = await self._load_query(data.get('prev_id', ''), save_access=False)
+            data = await self._load_query(plugin_ctx, data.get('prev_id', ''), save_access=False)
         return data.get('corpora', []) if data is not None else []
 
-    async def open(self, data_id):
-        ans = await self._load_query(data_id, save_access=True)
+    async def open(self, plugin_ctx, data_id):
+        ans = await self._load_query(plugin_ctx, data_id, save_access=True)
         if ans is not None and 'corpora' not in ans:
-            ans['corpora'] = await self._find_used_corpora(ans.get('prev_id'))
+            ans['corpora'] = await self._find_used_corpora(plugin_ctx, ans.get('prev_id'))
         return ans
 
-    async def _load_query(self, data_id: str, save_access: bool):
+    async def _load_query(self, plugin_ctx: AbstractUserPluginCtx, data_id: str, save_access: bool):
         """
         Loads operation data according to the passed data_id argument.
         The data are assumed to be public (as are URL parameters of a query).
 
         arguments:
-        data_id -- an unique ID of operation data
+        data_id -- a unique ID of operation data
 
         returns:
         a dictionary containing operation data or None if nothing is found
@@ -177,7 +178,7 @@ class MySqlQueryPersistence(AbstractQueryPersistence):
         try:
             data = await self.db.get(mk_key(data_id))
             if data is None:
-                async with self._archive.cursor() as cursor:
+                async with self._archive.cursor_from_ctx(plugin_ctx) as cursor:
                     await cursor.execute(
                         'SELECT data, created, num_access FROM kontext_conc_persistence WHERE id = %s LIMIT 1', (data_id,))
                     tmp = await cursor.fetchone()
@@ -233,8 +234,8 @@ class MySqlQueryPersistence(AbstractQueryPersistence):
 
         return latest_id
 
-    async def archive(self, user_id, conc_id, revoke=False):
-        async with self._archive.cursor() as cursor:
+    async def archive(self, plugin_ctx, conc_id, revoke=False):
+        async with self._archive.cursor_from_ctx(plugin_ctx) as cursor:
             await cursor.execute(
                 'SELECT id, data, created, num_access, last_access FROM kontext_conc_persistence WHERE id = %s LIMIT 1',
                 (conc_id,)
@@ -269,7 +270,7 @@ class MySqlQueryPersistence(AbstractQueryPersistence):
                         ans = 1
                     else:
                         stored_user_id = data.get('user_id', None)
-                        if user_id != stored_user_id:
+                        if plugin_ctx.user_id != stored_user_id:
                             raise ForbiddenException(
                                 'Cannot change status of a concordance belonging to another user')
                         await cursor.execute(

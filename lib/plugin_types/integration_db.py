@@ -19,6 +19,7 @@
 import abc
 from contextlib import AbstractAsyncContextManager, AbstractContextManager
 from typing import Generic, Optional, TypeVar
+from action.plugin.ctx import AbstractBasePluginCtx
 
 N = TypeVar('N')
 R = TypeVar('R')
@@ -38,7 +39,7 @@ class DbContextManager(AbstractContextManager, Generic[T]):
         pass
 
 
-class IntegrationDatabase(abc.ABC, Generic[N, R, SN, SR]):
+class IntegrationDatabase(abc.ABC, Generic[N, R]):
     """
     Integration DB plugin allows sharing a single database connection pool across multiple plugins
     which can be convenient in case KonText is integrated into an existing information system with
@@ -48,7 +49,7 @@ class IntegrationDatabase(abc.ABC, Generic[N, R, SN, SR]):
     where terms like 'cursor', 'commit', 'rollback' are common. But in general, it should be possible
     to wrap also some NoSQL databases if needed.
 
-    Also please note that "integration database" is not to be meant for a standalone KonText
+    Also, please note that "integration database" is not to be meant for a standalone KonText
     installations. KonText itself (with default plug-ins) uses the DB (aka KeyValueStorage) plugin
     for its operations. But if you have an existing information system and do not want redundant
     information in KonText's db, the "integration_db" is the way to go.
@@ -102,6 +103,10 @@ class IntegrationDatabase(abc.ABC, Generic[N, R, SN, SR]):
         pass
 
     @abc.abstractmethod
+    async def create_connection(self) -> T:
+        pass
+
+    @abc.abstractmethod
     def connection(self) -> AsyncDbContextManager[N]:
         """
         Return an async connection to the integration database from pool
@@ -113,6 +118,10 @@ class IntegrationDatabase(abc.ABC, Generic[N, R, SN, SR]):
         """
         Create a new async database cursor
         """
+        pass
+
+    @abc.abstractmethod
+    def cursor_from_ctx(self, ctx: AbstractBasePluginCtx, dictionary = True) -> AsyncDbContextManager[R]:
         pass
 
     @abc.abstractmethod

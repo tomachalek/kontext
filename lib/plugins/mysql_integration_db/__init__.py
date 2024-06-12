@@ -19,22 +19,21 @@
 import logging
 import time
 
-import aiomysql
-import pymysql.cursors
+from mysql.connector.aio.abstracts import MySQLConnectionAbstract, MySQLCursorAbstract
 from plugin_types.integration_db import IntegrationDatabase
 from plugins.common.mysql import MySQLOps
 
 
-class MySqlIntegrationDb(MySQLOps, IntegrationDatabase[aiomysql.Connection, aiomysql.Cursor, pymysql.Connection, pymysql.cursors.Cursor]):
+class MySqlIntegrationDb(MySQLOps, IntegrationDatabase[MySQLConnectionAbstract, MySQLCursorAbstract]):
     """
     MySqlIntegrationDb is a variant of integration_db plug-in providing access
     to MySQL/MariaDB instances. It is recommended for:
      1) integration with existing MySQL/MariaDB information systems,
      2) self-contained production installations with many registered users and
-        thousands or more search requests per day where most of the search
+        thousands or more search requests per day, where most of the search
         requests are archived
 
-    Please make sure scripts/schema.sql is applied to your database. Otherwise
+    Please make sure scripts/schema.sql is applied to your database. Otherwise,
     the plug-in fails to start. In case of a Dockerized installation, this
     is done automatically.
     """

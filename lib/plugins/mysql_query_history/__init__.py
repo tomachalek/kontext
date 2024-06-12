@@ -90,19 +90,19 @@ class MySqlQueryHistory(AbstractQueryHistory):
         self._auth = auth
         self._page_num_records = int(conf.get('plugins', 'query_history')['page_num_records'])
 
-    async def store(self, user_id, query_id, q_supertype):
+    async def store(self, plugin_ctx, query_id, q_supertype):
         created = int(datetime.utcnow().timestamp())
         corpora = (await self._query_persistence.open(query_id))['corpora']
-        async with self._db.cursor() as cursor:
+        async with self._db.cursor_from_ctx(plugin_ctx) as cursor:
             await cursor.executemany(
                 f'INSERT IGNORE INTO {self.TABLE_NAME} '
                 '(corpus_name, query_id, user_id, q_supertype, created) VALUES (%s, %s, %s, %s, %s)',
-                [(corpus, query_id, user_id, q_supertype, created) for corpus in corpora]
+                [(corpus, query_id, plugin_ctx.user_id, q_supertype, created) for corpus in corpora]
             )
         return created
 
-    async def _update_name(self, user_id, query_id, created, new_name) -> bool:
-        async with self._db.cursor() as cursor:
+    async def _update_name(self, plugin_ctx, user_id, query_id, created, new_name) -> bool:
+        async with self._db.cursor_from_ctx(plugin_ctx) as cursor:
             await cursor.execute(
                 f'UPDATE {self.TABLE_NAME} '
                 'SET name = %s '
@@ -112,22 +112,22 @@ class MySqlQueryHistory(AbstractQueryHistory):
             await cursor.connection.commit()
             return cursor.rowcount > 0
 
-    async def make_persistent(self, user_id, query_id, q_supertype, created, name) -> bool:
-        if await self._update_name(user_id, query_id, created, name):
-            await self._query_persistence.archive(user_id, query_id)
+    async def make_persistent(self, plugin_ctx, query_id, q_supertype, created, name) -> bool:
+        if await self._update_name(plugin_ctx, plugin_ctx.user_id, query_id, created, name):
+            await self._query_persistence.archive(plugin_ctx, query_id)
         else:
-            c = await self.store(user_id, query_id, q_supertype)
-            await self._update_name(user_id, query_id, c, name)
+            c = await self.store(plugin_ctx.user_id, query_id, q_supertype)
+            await self._update_name(plugin_ctx, plugin_ctx.user_id, query_id, c, name)
         return True
 
-    async def make_transient(self, user_id, query_id, created, name) -> bool:
-        return await self._update_name(user_id, query_id, created, None)
+    async def make_transient(self, plugin_ctx, query_id, created, name) -> bool:
+        return await self._update_name(plugin_ctx, plugin_ctx.user_id, query_id, created, None)
 
-    async def delete(self, user_id, query_id, created):
-        async with self._db.cursor() as cursor:
+    async def delete(self, plugin_ctx, query_id, created):
+        async with self._db.cursor_from_ctx(plugin_ctx) as cursor:
             await cursor.execute(
                 f'DELETE FROM {self.TABLE_NAME} WHERE user_id = %s AND query_id = %s AND created = %s',
-                (user_id, query_id, created)
+                (plugin_ctx.user_id, query_id, created)
             )
             await cursor.connection.commit()
             return cursor.rowcount
@@ -207,7 +207,7 @@ class MySqlQueryHistory(AbstractQueryHistory):
         if offset:
             values.append(offset)
 
-        async with self._db.cursor() as cursor:
+        async with self._db.cursor_from_ctx(plugin_ctx) as cursor:
             await cursor.execute(f'''
                 SELECT DISTINCT query_id, created, name, q_supertype FROM {self.TABLE_NAME} WHERE
                 {' AND '.join(where_sql)}
@@ -218,10 +218,10 @@ class MySqlQueryHistory(AbstractQueryHistory):
 
             full_data = []
             corpora = CorpusCache(corpus_factory)
-            rows = [item async for item in cursor]
+            rows = [item for item in await cursor.fetchall()]
             qdata_map = {}
             for item in rows:
-                stored = await self._query_persistence.open(item['query_id'])
+                stored = await self._query_persistence.open(plugin_ctx, item['query_id'])
                 if stored:
                     qdata_map[item['query_id']] = stored
             subc_names = await self._subc_archive.get_names(

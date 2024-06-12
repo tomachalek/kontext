@@ -69,6 +69,7 @@ class CreateSubcorpusTask:
         os.chmod(path, 0o664)
         with plugins.runtime.SUBC_STORAGE as sr:
             await sr.create(
+                plugin_ctx=None,
                 ident=subcorpus_id.id,
                 author=self._author,
                 size=conc.size(),

@@ -128,22 +128,15 @@ class FederatedAuthWithFailover(AbstractSemiInternalAuth):
     def logout(self, session):
         session.clear()
 
-    async def corpus_access(self, user_dict, corpus_name) -> CorpusAccess:
-        corpora = self.permitted_corpora(user_dict)
+    async def corpus_access(self, plugin_ctx, corpus_name) -> CorpusAccess:
+        corpora = self.permitted_corpora(plugin_ctx.session.get('user'))
         if corpus_name in corpora:
             return False, True, ''
         return False, False, ''
 
-    async def permitted_corpora(self, user_dict) -> List[str]:
-        """
-        Returns a dictionary containing corpora IDs user can access.
-
-        :param user_dict -- user info as stored in session
-        :return:
-        a dict canonical_corpus_id=>corpus_id
-        """
+    async def permitted_corpora(self, plugin_ctx):
         # fetch groups based on user_id (manual and shib based) intersect with corplist
-        groups = self.get_groups_for(user_dict)
+        groups = self.get_groups_for(plugin_ctx.session.get('user'))
         return [corpora['ident'] for corpora in self._corplist
                 if len(set(corpora.get('access', [])).intersection(set(groups))) > 0] + ['susanne', 'syn2015', 'syn2020']
 
@@ -259,7 +252,7 @@ async def ajax_get_permitted_corpora(amodel: UserActionModel, req: KRequest, res
     """
     An exposed HTTP action showing permitted corpora required by client-side widget.
     """
-    corpora = await plugins.runtime.AUTH.instance.permitted_corpora(amodel.session_get('user'))
+    corpora = await plugins.runtime.AUTH.instance.permitted_corpora(amodel.plugin_ctx)
     return dict(permitted_corpora=dict((c, '') for c in corpora))
 
 

@@ -182,22 +182,22 @@ class CentralAuth(AbstractRemoteAuth):
             else:  # logout => clear current user's session data and set new credentials
                 plugin_ctx.session['user'] = self.anonymous_user(plugin_ctx)
 
-    async def corpus_access(self, user_dict, corpus_name: str) -> CorpusAccess:
+    async def corpus_access(self, plugin_ctx, corpus_name: str) -> CorpusAccess:
         if corpus_name == IMPLICIT_CORPUS:
             return CorpusAccess(False, True, '')
-        with self._db.cursor() as cursor:
-            _, access, variant = await self._db.corpus_access(cursor, user_dict['id'], corpus_name)
+        with self._db.cursor_from_ctx(plugin_ctx) as cursor:
+            _, access, variant = await self._db.corpus_access(cursor, plugin_ctx.user_id, corpus_name)
         return CorpusAccess(False, access, variant)
 
-    async def permitted_corpora(self, user_dict):
+    async def permitted_corpora(self, plugin_ctx):
         """
         Fetches list of corpora available to the current user
 
         arguments:
         user_dict -- a user credentials dictionary
         """
-        with self._db.cursor() as cursor:
-            corpora = await self._db.get_permitted_corpora(cursor, str(user_dict['id']))
+        with self._db.cursor_from_ctx(plugin_ctx) as cursor:
+            corpora = await self._db.get_permitted_corpora(cursor, str(plugin_ctx.user_id))
         if IMPLICIT_CORPUS not in corpora:
             corpora.append(IMPLICIT_CORPUS)
         return corpora

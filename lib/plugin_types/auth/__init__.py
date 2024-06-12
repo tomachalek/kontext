@@ -12,16 +12,16 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 
-from typing import TYPE_CHECKING, Any, Dict, List, NamedTuple, Optional, Tuple
+from typing import Any, Dict, List, NamedTuple, Optional, Tuple
 
+from typing import TYPE_CHECKING
 try:
     from typing import TypedDict
 except ImportError:
     from typing_extensions import TypedDict
 
-# this is to fix cyclic imports when running the app caused by typing
 if TYPE_CHECKING:
-    from action.plugin.ctx import PluginCtx
+    from action.plugin.ctx import AbstractUserPluginCtx
 
 import abc
 
@@ -140,23 +140,21 @@ class AbstractAuth(abc.ABC, metaclass=MetaAbstractAuth):
         return False
 
     @abc.abstractmethod
-    async def corpus_access(self, user_dict: UserInfo, corpus_name: str) -> CorpusAccess:
+    async def corpus_access(self, plugin_ctx: 'AbstractUserPluginCtx', corpus_name: str) -> CorpusAccess:
         """
         Return a 3-tuple (is owner, has read access, corpus variant)
         """
 
     @abc.abstractmethod
-    async def permitted_corpora(self, user_dict: UserInfo) -> List[str]:
+    async def permitted_corpora(self, plugin_ctx: 'AbstractUserPluginCtx') -> List[str]:
         """
         Return a list of corpora accessible by a user
 
         arguments:
-        user_dict -- user credentials as returned by validate_user()
-                     (or as written to session by revalidate() in case
-                     of AbstractRemoteAuth implementations).
+        plugin_ctx -- a plug-in ctx instance
         """
 
-    async def validate_access(self, corpus_name: str, user_dict: UserInfo) -> Tuple[bool, str]:
+    async def validate_access(self, plugin_ctx, corpus_name: str) -> Tuple[bool, str]:
         """
         returns a 2-tuple ( "has access?", accessible variant )
         """
@@ -164,10 +162,10 @@ class AbstractAuth(abc.ABC, metaclass=MetaAbstractAuth):
             return False, ''
         if self.ignores_corpora_names_case():
             corpus_name = corpus_name.lower()
-        _, access, variant = await self.corpus_access(user_dict, corpus_name)
+        _, access, variant = await self.corpus_access(plugin_ctx, corpus_name)
         return access, variant
 
-    def on_forbidden_corpus(self, plugin_ctx: 'PluginCtx', corpname: str, corp_variant: str):
+    def on_forbidden_corpus(self, plugin_ctx: 'AbstractUserPluginCtx', corpname: str, corp_variant: str):
         """
         Optional method run in case KonText finds out that user
         does not have access rights to a corpus specified by 'corpname'.
@@ -182,14 +180,14 @@ class AbstractAuth(abc.ABC, metaclass=MetaAbstractAuth):
             raise ImmediateRedirectException(plugin_ctx.create_url('corpora/corplist', {}))
 
     @abc.abstractmethod
-    async def get_user_info(self, plugin_ctx: 'PluginCtx') -> GetUserInfo:
+    async def get_user_info(self, plugin_ctx: 'AbstractUserPluginCtx') -> GetUserInfo:
         """
         Return a dictionary containing all the data about a user.
         Sensitive information like password hashes, recovery questions
         etc. are not expected/required to be included.
         """
 
-    def logout_hook(self, plugin_ctx: 'PluginCtx'):
+    def logout_hook(self, plugin_ctx: 'AbstractUserPluginCtx'):
         """
         An action performed after logout process finishes
         """

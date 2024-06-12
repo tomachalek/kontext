@@ -497,7 +497,7 @@ class UserActionModel(BaseActionModel, AbstractUserModel):
                     corpname = queries[0].get('corpname', None)
                     if corpname is not None:
                         with plugins.runtime.AUTH as auth:
-                            has_access, _ = await auth.validate_access(corpname, self.plugin_ctx.user_dict)
+                            has_access, _ = await auth.validate_access(self.plugin_ctx, corpname)
                             if not has_access:
                                 corpname = None
 

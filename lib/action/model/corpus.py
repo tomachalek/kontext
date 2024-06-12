@@ -192,7 +192,7 @@ class CorpusActionModel(UserActionModel):
         with plugins.runtime.QUERY_PERSISTENCE as query_persistence, plugins.runtime.DISPATCH_HOOK as dh:
             if len(url_q) > 0 and query_persistence.is_valid_id(url_q[0]):
                 self._q_code = url_q[0][1:]
-                aqdata = await query_persistence.open(self._q_code)
+                aqdata = await query_persistence.open(self.plugin_ctx, self._q_code)
                 # !!! must create a copy here otherwise _q_data (as prev query)
                 # will be rewritten by self.args.q !!!
                 if aqdata is not None:
@@ -222,7 +222,7 @@ class CorpusActionModel(UserActionModel):
         if conc_data.get('lastop_form', {}).get('form_type') in ('query', 'filter') and not self.user_is_anonymous():
             with plugins.runtime.QUERY_HISTORY as qh:
                 ts = await qh.store(
-                    user_id=self.session_get('user', 'id'),
+                    plugin_ctx=self.plugin_ctx,
                     query_id=query_id, q_supertype='conc')
                 return ts
         return None
@@ -241,7 +241,7 @@ class CorpusActionModel(UserActionModel):
                 corpname, redirect = await self._determine_curr_corpus(req_args, is_api)
             else:
                 corpname, redirect = await self._corpus_name_determiner(req_args, self.session_get('user'))
-            has_access, variant = await auth.validate_access(corpname, self.session_get('user'))
+            has_access, variant = await auth.validate_access(self.plugin_ctx, corpname)
             if has_access and redirect:
                 url_pref = action_props.action_prefix + '/' if action_props.action_prefix else ''
                 if len(url_pref) > 0:
@@ -251,7 +251,7 @@ class CorpusActionModel(UserActionModel):
             elif not has_access:
                 auth.on_forbidden_corpus(self.plugin_ctx, corpname, variant)
             for al_corp in req_args.getlist('align'):
-                al_access, al_variant = await auth.validate_access(al_corp, self.session_get('user'))
+                al_access, al_variant = await auth.validate_access(self.plugin_ctx, al_corp)
                 # we cannot accept aligned corpora without access right
                 # or with different variant (from implementation reasons in this case)
                 # than the main corpus has
@@ -398,7 +398,7 @@ class CorpusActionModel(UserActionModel):
         # fallback option: if no current corpus is set then we try previous user's corpus
         # and if no such exists then we try default one as configured in settings.xml
         async def test_fn(auth_plg, cname):
-            return await auth_plg.validate_access(cname, self.session_get('user'))
+            return await auth_plg.validate_access(self.plugin_ctx, cname)
 
         if cn and cn.startswith('omezeni/'):  # legacy corpus ID; still can be encountered
             cn = cn[len('omezeni/'):]
@@ -722,7 +722,7 @@ class CorpusActionModel(UserActionModel):
 
     async def create_preflight_subcorpus(self) -> str:
         with plugins.runtime.SUBC_STORAGE as sc:
-            return await sc.create_preflight(self.subcpath, self.corp.corpname)
+            return await sc.create_preflight(self.plugin_ctx, self.subcpath, self.corp.corpname)
 
 
 class CorpusPluginCtx(UserPluginCtx, AbstractCorpusPluginCtx):

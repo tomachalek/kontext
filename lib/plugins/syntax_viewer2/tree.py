@@ -17,7 +17,41 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 # 02110-1301, USA.
 
-from plugins.default_syntax_viewer.manatee_backend import TreexTemplate
+from util import as_async
+
+class TreexTemplate:
+
+    def __init__(self, id_list, tree_list, conf):
+        self._id_list = id_list
+        self._tree_list = tree_list
+        self._conf = conf
+
+    def _generate_desc(self):
+        ans = []
+        for item in self._tree_list[0]:  # TODO
+            ans.append([item.word, item.id])
+        return ans
+
+    @as_async
+    def export(self):
+        sentence = ' '.join(n.word for n in self._tree_list[0])
+        graph_list = []
+        for i in range(len(self._id_list)):
+            graph_list.append({
+                'zones': {
+                    'cs': {  # TODO
+                        'trees': {
+                            'default': {
+                                'layer': self._conf[self._id_list[i]].layer_type,
+                                'nodes': self._tree_list[0]
+                            }
+                        },
+                        'sentence': sentence
+                    }
+                },
+                'desc': self._generate_desc()
+            })
+        return graph_list
 
 
 class UcnkTreeTemplate(TreexTemplate):

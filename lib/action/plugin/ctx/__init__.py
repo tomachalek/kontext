@@ -102,6 +102,11 @@ class AbstractBasePluginCtx(abc.ABC):
     def user_lang(self) -> str:
         pass
 
+    @property
+    @abc.abstractmethod
+    def user_id(self) -> Optional[int]:
+        pass
+
     @abc.abstractmethod
     def translate(self, string: str) -> str:
         pass

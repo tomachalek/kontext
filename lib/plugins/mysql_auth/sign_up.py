@@ -16,21 +16,23 @@ import datetime
 import hashlib
 import uuid
 
-from aiomysql import Connection
+from mysql.connector.aio.abstracts import MySQLConnectionAbstract
 from plugin_types.auth.sign_up import AbstractSignUpToken
+from action.plugin.ctx import AbstractUserPluginCtx
 from plugins.common.mysql import MySQLOps
 
 
-class SignUpToken(AbstractSignUpToken[Connection]):
+class SignUpToken(AbstractSignUpToken[MySQLConnectionAbstract]):
     """
     Note: the class methods do not handle transactions - it's up to the calling method
     """
 
-    def __init__(self, value=None, user_data=None, label=None, ttl=3600):
+    def __init__(self, plugin_ctx: AbstractUserPluginCtx, value=None, user_data=None, label=None, ttl=3600):
         self.value = value if value is not None else hashlib.sha1(
             uuid.uuid4().bytes).hexdigest()
         if user_data is None:
             user_data = {}
+        self._plugin_ctx = plugin_ctx
         self.username = user_data.get('username')
         self.firstname = user_data.get('firstname')
         self.lastname = user_data.get('lastname')
@@ -43,7 +45,7 @@ class SignUpToken(AbstractSignUpToken[Connection]):
         self.bound = False
 
     async def save(self, db: MySQLOps):
-        async with db.cursor() as cursor:
+        async with db.cursor_from_ctx(self._plugin_ctx) as cursor:
             await cursor.execute(
                 'INSERT INTO kontext_sign_up_token '
                 '(token_value, label, created, ttl, username, firstname, lastname, pwd_hash, email, affiliation) '
@@ -53,7 +55,7 @@ class SignUpToken(AbstractSignUpToken[Connection]):
             self.bound = True
 
     async def load(self, db: MySQLOps):
-        async with db.cursor() as cursor:
+        async with db.cursor_from_ctx(self._plugin_ctx) as cursor:
             await cursor.execute(
                 'DELETE FROM kontext_sign_up_token '
                 'WHERE  TIMESTAMPDIFF(SECOND, created, NOW()) > %s ', (self.ttl, ))
@@ -76,12 +78,12 @@ class SignUpToken(AbstractSignUpToken[Connection]):
             self.affiliation = row.get('affiliation')
 
     async def delete(self, db: MySQLOps):
-        async with db.cursor() as cursor:
+        async with db.cursor_from_ctx(self._plugin_ctx) as cursor:
             await cursor.execute('DELETE FROM kontext_sign_up_token WHERE token_value = %s', (self.value,))
         self.bound = False
 
     async def is_valid(self, db: MySQLOps):
-        async with db.cursor() as cursor:
+        async with db.cursor_from_ctx(self._plugin_ctx) as cursor:
             await cursor.execute(
                 'SELECT value '
                 'FROM kontext_sign_up_token '

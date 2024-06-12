@@ -243,13 +243,13 @@ class DefaultQueryPersistence(AbstractQueryPersistence):
             latest_id = prev_data[ID_KEY]
         return latest_id
 
-    async def archive(self, user_id, conc_id, revoke=False):
+    async def archive(self, plugin_ctx, conc_id, revoke=False):
         key = self._mk_key(conc_id)
         data = await self.open(conc_id)
         if data is None:
             raise UserReadableException('Concordance key \'%s\' not found.' % (conc_id,))
         stored_user_id = data.get('user_id', None)
-        if user_id != stored_user_id:
+        if plugin_ctx.user_id != stored_user_id:
             raise ForbiddenException(
                 'Cannot change status of a concordance belonging to another user')
 

@@ -150,7 +150,7 @@ class StableQueryPersistence(AbstractQueryPersistence):
     def _latest_archive(self):
         return self._archives[0]
 
-    async def archive(self, user_id, conc_id, revoke=False):
+    async def archive(self, plugin_ctx, conc_id, revoke=False):
         archive_db = self.find_key_db(conc_id)
         if archive_db:
             cursor = archive_db.cursor()
@@ -178,7 +178,7 @@ class StableQueryPersistence(AbstractQueryPersistence):
                 ans = 0
             else:
                 stored_user_id = data.get('user_id', None)
-                if user_id != stored_user_id:
+                if plugin_ctx.user_id != stored_user_id:
                     raise ForbiddenException(
                         'Cannot change status of a concordance belonging to another user')
                 curr_time = time.time()

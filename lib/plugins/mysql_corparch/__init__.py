@@ -29,7 +29,7 @@ from action.krequest import KRequest
 from action.model.user import UserActionModel
 from action.plugin.ctx import AbstractCorpusPluginCtx, PluginCtx
 from action.response import KResponse
-from aiomysql.cursors import Cursor
+from mysql.connector.aio.abstracts import MySQLConnectionAbstract
 from corplib.abstract import SubcorpusIdent
 from plugin_types.corparch import (
     AbstractSearchableCorporaArchive, CorpusListItem)
@@ -192,7 +192,7 @@ class MySQLCorparch(AbstractSearchableCorporaArchive):
     async def export_favorite(self, plugin_ctx, favitems):
         ans = []
         favitems_corpids = [x.corpora[0]['id'] for x in favitems]
-        async with self.backend.cursor() as cursor:
+        async with self.backend.cursor_from_ctx(plugin_ctx) as cursor:
             descriptions = await self.backend.load_corpora_descriptions(
                 cursor, favitems_corpids, plugin_ctx.user_lang)
             for item in favitems:
@@ -217,7 +217,7 @@ class MySQLCorparch(AbstractSearchableCorporaArchive):
                            offset=0, limit=-1, favourites=()):
         user_id = plugin_ctx.user_dict['id']
         ans = OrderedDict()
-        async with self._backend.cursor() as cursor:
+        async with self._backend.cursor_from_ctx(plugin_ctx) as cursor:
             for row in await self._backend.list_corpora(
                     cursor=cursor, user_id=user_id, substrs=substrs, keywords=keywords, min_size=min_size,
                     max_size=max_size, requestable=requestable, offset=offset,
@@ -225,8 +225,8 @@ class MySQLCorparch(AbstractSearchableCorporaArchive):
                 ans[row['id']] = self.corpus_list_item_from_row(plugin_ctx, row)
             return ans
 
-    async def get_l10n_keywords(self, id_list, lang_code) -> List[Tuple[str, str]]:
-        all_keywords = await self.all_keywords(lang_code)
+    async def get_l10n_keywords(self, plugin_ctx, id_list) -> List[Tuple[str, str]]:
+        all_keywords = await self.all_keywords(plugin_ctx)
         ans = []
         for keyword_id in id_list:
             if keyword_id in all_keywords:
@@ -235,7 +235,7 @@ class MySQLCorparch(AbstractSearchableCorporaArchive):
                 ans.append((keyword_id, keyword_id))
         return ans
 
-    async def _localize_corpus_info(self, data: CorpusInfo, lang_code) -> CorpusInfo:
+    async def _localize_corpus_info(self, plugin_ctx, data: CorpusInfo, lang_code) -> CorpusInfo:
         """
         Updates localized values from data (please note that not all
         the data are localized - e.g. paths to files) by a single variant
@@ -247,7 +247,7 @@ class MySQLCorparch(AbstractSearchableCorporaArchive):
             ans.metadata.desc = self._tt_desc_i18n[lang_code][ans.metadata.desc]
         else:
             ans.metadata.desc = ''
-        ans.metadata.keywords = await self.get_l10n_keywords(ans.metadata.keywords, lang_code)
+        ans.metadata.keywords = await self.get_l10n_keywords(plugin_ctx, ans.metadata.keywords)
         ans.description = ans.localized_desc(lang_code)
         return ans
 
@@ -258,9 +258,9 @@ class MySQLCorparch(AbstractSearchableCorporaArchive):
         """
         return lang.split('_')[0]
 
-    async def all_keywords(self, lang):
+    async def all_keywords(self, plugin_ctx):
         if self._keywords is None:
-            async with self._backend.cursor() as cursor:
+            async with self._backend.cursor_from_ctx(plugin_ctx) as cursor:
                 self._keywords = defaultdict(lambda: OrderedDict())
                 for row in await self._backend.load_all_keywords(cursor):
                     #  id, label_cs, label_en, color
@@ -268,10 +268,10 @@ class MySQLCorparch(AbstractSearchableCorporaArchive):
                     self._keywords['en'][row['id']] = row['label_en']
                     self._colors[row['id']] = self._parse_color(
                         row['color']) if row['color'] else None
-        lang_key = self._get_iso639lang(lang)
+        lang_key = self._get_iso639lang(plugin_ctx.user_lang)
         return self._keywords[lang_key]
 
-    async def _get_tckcqs_providers(self, cursor: Cursor, corpus_id):
+    async def _get_tckcqs_providers(self, cursor: MySQLConnectionAbstract, corpus_id):
         if corpus_id not in self._tc_providers and corpus_id not in self._kc_providers:
             self._tc_providers[corpus_id] = TokenConnect()
             self._kc_providers[corpus_id] = KwicConnect()
@@ -290,7 +290,8 @@ class MySQLCorparch(AbstractSearchableCorporaArchive):
                     self._qs_providers[corpus_id].providers.append(row['provider'])
         return self._tc_providers[corpus_id], self._kc_providers[corpus_id], self._tl_providers[corpus_id], self._qs_providers[corpus_id]
 
-    async def _fetch_corpus_info(self, plugin_ctx: AbstractCorpusPluginCtx, cursor: Cursor, corpus_id: str) -> CorpusInfo:
+    async def _fetch_corpus_info(
+            self, plugin_ctx: AbstractCorpusPluginCtx, cursor: MySQLConnectionAbstract, corpus_id: str) -> CorpusInfo:
         cache_key = (corpus_id, plugin_ctx.user_lang)
         if cache_key not in self._corpus_info_cache:
             row = await self._backend.load_corpus(cursor, corpus_id)
@@ -316,7 +317,7 @@ class MySQLCorparch(AbstractSearchableCorporaArchive):
                     cursor, corpus_id)
 
                 if plugin_ctx.user_lang is not None:
-                    full_corp_info = await self._localize_corpus_info(corp, lang_code=plugin_ctx.user_lang)
+                    full_corp_info = await self._localize_corpus_info(plugin_ctx, corp)
                 else:
                     full_corp_info = corp
                 full_corp_info.manatee = await plugin_ctx.corpus_factory.get_info(corpus_id)
@@ -342,7 +343,7 @@ class MySQLCorparch(AbstractSearchableCorporaArchive):
             try:
                 # get rid of path-like corpus ID prefix
                 corp_name = corp_name.lower()
-                async with self._backend.cursor() as cursor:
+                async with self._backend.cursor_from_ctx(plugin_ctx) as cursor:
                     return await self._fetch_corpus_info(plugin_ctx, cursor, corp_name)
             except TypeError as ex:
                 logging.getLogger(__name__).warning(
@@ -355,7 +356,7 @@ class MySQLCorparch(AbstractSearchableCorporaArchive):
             self, plugin_ctx: 'PluginCtx', corp_name: str, full_names: Iterable[str]) -> List[StructAttrInfo]:
         items = await super().get_structattrs_info(plugin_ctx, corp_name, full_names)
         items_index = dict((f'{x.structure_name}{x.name}', x) for x in items)
-        async with self.backend.cursor() as cursor:
+        async with self.backend.cursor_from_ctx(plugin_ctx) as cursor:
             data = await self.backend.load_corpus_structattrs(cursor, corp_name)
         for row in data:
             item = items_index.get(f'{row["structure_name"]}{row["name"]}')
@@ -374,7 +375,7 @@ class MySQLCorparch(AbstractSearchableCorporaArchive):
     def create_corplist_provider(self, plugin_ctx):
         return DefaultCorplistProvider(plugin_ctx, self, self._tag_prefix)
 
-    async def _export_favorite(self, cursor: Cursor, plugin_ctx):
+    async def _export_favorite(self, cursor: MySQLConnectionAbstract, plugin_ctx):
         ans = []
         for item in await plugins.runtime.USER_ITEMS.instance.get_user_items(plugin_ctx):
             tmp = item.to_dict()
@@ -406,18 +407,18 @@ class MySQLCorparch(AbstractSearchableCorporaArchive):
     def export_actions():
         return bp
 
-    async def _export_featured(self, cursor: Cursor, plugin_ctx: PluginCtx):
+    async def _export_featured(self, cursor: MySQLConnectionAbstract, plugin_ctx: PluginCtx):
         return [
             dict(r)
             for r in await self.backend.load_featured_corpora(cursor, plugin_ctx.user_id, plugin_ctx.user_lang)]
 
     async def export(self, plugin_ctx):
-        async with self._backend.cursor() as cursor:
+        async with self._backend.cursor_from_ctx(plugin_ctx) as cursor:
             return dict(
                 favorite=await self._export_favorite(cursor, plugin_ctx),
                 featured=await self._export_featured(cursor, plugin_ctx),
                 corpora_labels=[(k, lab, self.get_label_color(k))
-                                for k, lab in list((await self.all_keywords(plugin_ctx.user_lang)).items())],
+                                for k, lab in list((await self.all_keywords(plugin_ctx)).items())],
                 tag_prefix=self._tag_prefix,
                 max_num_hints=self._max_num_hints,
                 max_page_size=self.max_page_size

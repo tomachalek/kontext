@@ -25,6 +25,7 @@ from plugin_types.auth import CorpusAccess
 from plugin_types.corparch.corpus import TagsetInfo
 from plugin_types.corparch.install import InstallJson
 from plugin_types.corparch.registry import RegistryConf
+from action.plugin.ctx import AbstractBasePluginCtx
 
 CursorType = TypeVar('CursorType')
 
@@ -36,7 +37,7 @@ class DatabaseBackend(Generic[CursorType], abc.ABC):
     """
 
     @asynccontextmanager
-    async def cursor(self, dictionary=True) -> Generator[CursorType, None, None]:
+    async def cursor_from_ctx(self, plugin_ctx: AbstractBasePluginCtx, dictionary=True) -> Generator[CursorType, None, None]:
         pass
 
     @abc.abstractmethod

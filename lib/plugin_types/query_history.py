@@ -29,17 +29,17 @@ user.
 
 import abc
 from typing import Optional
-
+from action.plugin.ctx import AbstractUserPluginCtx
 
 class AbstractQueryHistory(abc.ABC):
 
     @abc.abstractmethod
-    async def store(self, user_id: int, query_id: str, q_supertype: str) -> int:
+    async def store(self, plugin_ctx: AbstractUserPluginCtx, query_id: str, q_supertype: str) -> int:
         """
         Store data as a new saved query
 
         arguments:
-        user_id -- a numeric ID of a user
+        plugin_ctx -- a plugin-ctx instance
         query_id -- a query identifier as produced by query_history plug-in
         q_supertype -- a super-type of the query (do not confuse with 'query type')
             conc - concordance (for backward compatibility reasons, None means also 'conc')
@@ -51,14 +51,15 @@ class AbstractQueryHistory(abc.ABC):
         """
 
     @abc.abstractmethod
-    async def make_persistent(self, user_id: int, query_id: str, q_supertype: str, created: Optional[int], name: str):
+    async def make_persistent(
+            self, ctx: AbstractUserPluginCtx, query_id: str, q_supertype: str, created: Optional[int], name: str):
         """
         Finds (if implemented) a specific query history
         record based on its respective concordance record.
         If not supported then the function
 
         arguments:
-        user_id -- a user ID (it is expected to be legit; so please avoid values passed from untrusted sources)
+        ctx -- a plugin context instance
         query_id -- a query ID
         created -- a UNIX timestamp of the upgraded item; it is possible to pass None in which case
                    the plug-in takes the most recent matching (by query_id) item
@@ -66,14 +67,14 @@ class AbstractQueryHistory(abc.ABC):
         """
 
     @abc.abstractmethod
-    async def make_transient(self, user_id: int, query_id: str, created: int, name: str):
+    async def make_transient(self, ctx: AbstractUserPluginCtx, query_id: str, created: int, name: str):
         """
         Remove name from the history item and let it be
         removed once it gets too old
         """
 
     @abc.abstractmethod
-    async def delete(self, user_id, query_id, created):
+    async def delete(self, plugin_ctx: AbstractUserPluginCtx, query_id, created):
         """
         Delete a named query from history.
 
@@ -84,7 +85,7 @@ class AbstractQueryHistory(abc.ABC):
         should be removed.
 
         arguments:
-        user_id -- user ID
+        plugin_ctx -- a plugin-ctx instance
         query_id -- query ID
         created -- creation UNIX timestamp
         """

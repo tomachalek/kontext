@@ -86,7 +86,7 @@ class MysqlAuthHandler(AbstractInternalAuth):
         self._case_sensitive_corpora_names = case_sensitive_corpora_names
 
     async def validate_user(self, plugin_ctx, username, password):
-        user_data = await self._find_user(username)
+        user_data = await self._find_user(plugin_ctx, username)
         valid_pwd = False
         if user_data:
             split = split_pwd_hash(user_data['pwd_hash'])
@@ -130,13 +130,12 @@ class MysqlAuthHandler(AbstractInternalAuth):
         user_id -- a database ID of a user
         password -- new password
         """
-        async with self.db.cursor() as cursor:
+        async with self.db.cursor_from_ctx(plugin_ctx) as cursor:
             await cursor.execute('SELECT username FROM kontext_user WHERE id = %s', (user_id,))
             row = await cursor.fetchone()
             if row is not None:
                 await cursor.execute('UPDATE kontext_user SET pwd_hash = %s WHERE id = %s',
                                      (mk_pwd_hash_default(password), user_id))
-                await cursor.connection.commit()
             else:
                 raise AuthException(plugin_ctx.translate('User %s not found.') % user_id)
 
@@ -144,16 +143,16 @@ class MysqlAuthHandler(AbstractInternalAuth):
     def _variant_prefix(corpname):
         return corpname.rsplit('/', 1)[0] if '/' in corpname else ''
 
-    async def corpus_access(self, user_dict, corpus_name) -> CorpusAccess:
+    async def corpus_access(self, plugin_ctx, corpus_name) -> CorpusAccess:
         if corpus_name == IMPLICIT_CORPUS:
             return CorpusAccess(False, True, '')
-        async with self._corparch_backend.cursor() as cursor:
-            _, access, variant = await self._corparch_backend.corpus_access(cursor, user_dict['id'], corpus_name)
+        async with self._corparch_backend.cursor_from_ctx(plugin_ctx) as cursor:
+            _, access, variant = await self._corparch_backend.corpus_access(cursor, plugin_ctx.user_id, corpus_name)
             return CorpusAccess(False, access, variant)
 
-    async def permitted_corpora(self, user_dict) -> List[str]:
-        async with self._corparch_backend.cursor() as cursor:
-            corpora = await self._corparch_backend.get_permitted_corpora(cursor, str(user_dict['id']))
+    async def permitted_corpora(self, plugin_ctx):
+        async with self._corparch_backend.cursor_from_ctx(plugin_ctx) as cursor:
+            corpora = await self._corparch_backend.get_permitted_corpora(cursor, str(plugin_ctx.user_id))
         if IMPLICIT_CORPUS not in corpora:
             corpora.append(IMPLICIT_CORPUS)
         return corpora
@@ -162,7 +161,7 @@ class MysqlAuthHandler(AbstractInternalAuth):
         return not self._case_sensitive_corpora_names
 
     async def get_user_info(self, plugin_ctx: PluginCtx) -> GetUserInfo:
-        async with self.db.cursor() as cursor:
+        async with self.db.cursor_from_ctx(plugin_ctx) as cursor:
             await cursor.execute(
                 'SELECT id, username, firstname, lastname, email '
                 'FROM kontext_user '
@@ -203,7 +202,7 @@ class MysqlAuthHandler(AbstractInternalAuth):
         else:
             return self._logout_url
 
-    async def _find_user(self, username):
+    async def _find_user(self, plugin_ctx, username):
         """
         Searches for user's data by his username. We assume that username is unique.
 
@@ -213,7 +212,7 @@ class MysqlAuthHandler(AbstractInternalAuth):
         returns:
         a dictionary containing user data or None if nothing is found
         """
-        async with self.db.cursor() as cursor:
+        async with self.db.cursor_from_ctx(plugin_ctx) as cursor:
             await cursor.execute(
                 'SELECT id, username, firstname, lastname, email, pwd_hash, affiliation '
                 'FROM kontext_user '
@@ -226,7 +225,7 @@ class MysqlAuthHandler(AbstractInternalAuth):
             % self.MIN_USERNAME_LENGTH)
 
     async def validate_new_username(self, plugin_ctx, username):
-        avail = await self._find_user(username) is None and 'admin' not in username
+        avail = await self._find_user(plugin_ctx, username) is None and 'admin' not in username
         valid = re.match(r'^[a-zA-Z0-9_-]{3,}$', username) is not None
         return avail, valid
 
@@ -308,11 +307,11 @@ class MysqlAuthHandler(AbstractInternalAuth):
             await conn.begin()
             try:
                 if token.is_stored():
-                    curr = await self._find_user(token.username)
+                    curr = await self._find_user(plugin_ctx, token.username)
                     if curr:
                         raise SignUpNeedsUpdateException()
 
-                    async with conn.cursor() as cursor:
+                    async with conn.cursor_from_ctx(plugin_ctx) as cursor:
                         await cursor.execute(
                             'INSERT INTO kontext_user (username, firstname, lastname, pwd_hash, email, affiliation) '
                             'VALUES (%s, %s, %s, %s, %s, %s)',

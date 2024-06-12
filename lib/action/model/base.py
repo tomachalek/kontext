@@ -227,5 +227,8 @@ class BasePluginCtx(AbstractBasePluginCtx):
     def user_lang(self) -> str:
         return self._request.ui_lang
 
+    def user_id(self) -> Optional[int]:
+        return self.session.get('user', {'id': None}).get('id')
+
     def translate(self, string: str) -> str:
         return self._request.translate(string)

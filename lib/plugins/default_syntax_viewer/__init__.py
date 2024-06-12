@@ -136,7 +136,7 @@ def load_plugin_conf_from_db(db: IntegrationDatabase, corp_table='kontext_corpus
             'SELECT name, syntax_viewer_conf_json '
             f'FROM {corp_table} '
             'WHERE syntax_viewer_conf_json IS NOT NULL')
-        return {row['name']: json.loads(row['syntax_viewer_conf_json']) for row in cursor}
+        return {row['name']: json.loads(row['syntax_viewer_conf_json']) for row in cursor.fetchall()}
 
 
 @plugins.inject(plugins.runtime.AUTH, plugins.runtime.INTEGRATION_DB)

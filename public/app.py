@@ -266,12 +266,17 @@ async def extract_jwt(request: Request):
 @application.middleware('request')
 async def set_locale(request: Request):
     request.ctx.locale = get_locale(request)
+    with plugins.runtime.INTEGRATION_DB as idb:
+        request.ctx.db = await idb.create_connection()
     if request.ctx.locale in application.ctx.translations:
         request.ctx.translations = application.ctx.translations[request.ctx.locale]
     else:
         request.ctx.translations = support.NullTranslations()
         logging.getLogger(__name__).warning(f'Requested unsupported locale {request.ctx.locale}')
 
+@application.middleware('response')
+async def close_db(request, response):
+    await request.ctx.db.close()
 
 @application.middleware('response')
 async def store_jwt(request: Request, response: HTTPResponse):

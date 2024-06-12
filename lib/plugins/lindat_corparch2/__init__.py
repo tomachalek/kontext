@@ -272,7 +272,7 @@ class DefaultCorplistProvider(CorplistProvider):
                 + ' ' + ' '.join('%s%s' % (self._tag_prefix, s) for s in query_keywords)
 
         ans = {'rows': []}
-        permitted_corpora = await self._auth.permitted_corpora(plugin_ctx.user_dict)
+        permitted_corpora = await self._auth.permitted_corpora(plugin_ctx)
 
         if plugin_ctx.request.args.get('minSize'):
             min_size = l10n.desimplify_num(plugin_ctx.request.args.get('minSize'), strict=False)
@@ -741,7 +741,7 @@ class CorpusArchive(AbstractSearchableCorporaArchive):
             return '{0} [{1}]'.format(text, plugin_ctx.translate('translation not available'))
 
     async def _export_featured(self, plugin_ctx: PluginCtx):
-        permitted_corpora = await self._auth.permitted_corpora(plugin_ctx.user_dict)
+        permitted_corpora = await self._auth.permitted_corpora(plugin_ctx)
 
         def is_featured(o: CorpusInfo):
             return o.metadata.featured

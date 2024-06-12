@@ -29,10 +29,10 @@ class NullQueryHistory(AbstractQueryHistory):
     def __init__(self):
         pass
 
-    async def store(self, user_id, query_id, q_supertype):
+    async def store(self, plugin_ctx, query_id, q_supertype):
         return int(datetime.utcnow().timestamp())
 
-    async def make_persistent(self, user_id, query_id, q_supertype, created, name) -> bool:
+    async def make_persistent(self, ctx, query_id, q_supertype, created, name) -> bool:
         return True
 
     async def make_transient(self, user_id, query_id, created, name) -> bool:

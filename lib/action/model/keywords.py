@@ -75,7 +75,7 @@ class KeywordsActionModel(CorpusActionModel):
                         corpora=[self._curr_kwform_args.corpname],
                         usesubcorp=self._curr_kwform_args.usesubcorp))
                 ts = await qh.store(
-                    user_id=self.session_get('user', 'id'),
+                    plugin_ctx=self.plugin_ctx,
                     query_id=query_id, q_supertype='kwords')
                 for fn in self._on_query_store:
                     await fn([query_id], ts, resp.result)

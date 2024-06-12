@@ -120,7 +120,7 @@ class DefaultCorplistProvider(CorplistProvider):
         ans = []
         for i, corp in enumerate(rows):
             used_keywords.update(corp.keywords)
-            corp.keywords = await self._corparch.get_l10n_keywords(corp.keywords, plugin_ctx.user_lang)
+            corp.keywords = await self._corparch.get_l10n_keywords(plugin_ctx, corp.keywords)
             corp.fav_id = favourite_corpora.get(corp.id, None)
             corp.found_in = get_found_in(corp, normalized_query_substrs)
             ans.append(corp.to_dict())

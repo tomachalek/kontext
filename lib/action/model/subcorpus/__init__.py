@@ -129,6 +129,7 @@ class SubcorpusActionModel(CorpusActionModel):
             subc = await self.cf.get_corpus(subc_id, no_cache_read=True)
             with plugins.runtime.SUBC_STORAGE as sr:
                 await sr.create(
+                    plugin_ctx=self.plugin_ctx,
                     ident=subc_id.id,
                     author=author,
                     size=subc.search_size,
@@ -165,6 +166,7 @@ class SubcorpusActionModel(CorpusActionModel):
             if not usesubcorp:
                 subc_id = await create_new_subc_ident(self.subcpath, self.corp.corpname)
                 await sr.create(
+                    plugin_ctx=self.plugin_ctx,
                     ident=subc_id.id,
                     author=self.plugin_ctx.user_dict,
                     size=specification.size,

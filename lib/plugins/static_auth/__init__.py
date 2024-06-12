@@ -89,19 +89,19 @@ class StaticAuth(AbstractRemoteAuth):
     def is_administrator(self, user_id):
         return False
 
-    async def corpus_access(self, user_dict: UserInfo, corpus_id: str) -> CorpusAccess:
-        zone = self._find_user(user_dict['id'])
+    async def corpus_access(self, plugin_ctx, corpus_id: str) -> CorpusAccess:
+        zone = self._find_user(plugin_ctx.user_id)
         if zone is None:
             return CorpusAccess(False, False, '')
         if corpus_id not in zone.corpora:
             return CorpusAccess(False, False, '')
         return CorpusAccess(False, True, zone.corpora[corpus_id])
 
-    async def permitted_corpora(self, user_dict: UserInfo) -> List[str]:
-        if self.is_anonymous(user_dict['id']):
+    async def permitted_corpora(self, plugin_ctx) -> List[str]:
+        if self.is_anonymous(plugin_ctx.user_id):
             return []
         else:
-            zone = self._find_user(user_dict['id'])
+            zone = self._find_user(plugin_ctx.user_id)
             return list(zone.corpora.keys())
 
     async def get_user_info(self, plugin_ctx: PluginCtx) -> GetUserInfo:

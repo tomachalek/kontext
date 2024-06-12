@@ -60,7 +60,7 @@ class MockAuth(AbstractAuth):
     async def corpus_access(self, user_dict, corpus_name):
         raise NotImplementedError()
 
-    async def permitted_corpora(self, user_dict):
+    async def permitted_corpora(self, plugin_ctx):
         raise NotImplementedError()
 
     async def get_user_info(self, plugin_ctx):

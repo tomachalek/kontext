@@ -140,16 +140,16 @@ class DefaultAuthHandler(AbstractInternalAuth):
     def _variant_prefix(corpname):
         return corpname.rsplit('/', 1)[0] if '/' in corpname else ''
 
-    async def corpus_access(self, user_dict, corpus_name) -> CorpusAccess:
+    async def corpus_access(self, plugin_ctx, corpus_name) -> CorpusAccess:
         if corpus_name == IMPLICIT_CORPUS:
             return False, True, ''
-        corpora = await self.db.get(mk_list_key(user_dict['id']), [])
+        corpora = await self.db.get(mk_list_key(plugin_ctx.user_id), [])
         if corpus_name in corpora:
             return False, True, self._variant_prefix(corpus_name)
         return False, False, ''
 
-    async def permitted_corpora(self, user_dict) -> List[str]:
-        corpora = await self.db.get(mk_list_key(user_dict['id']), [])
+    async def permitted_corpora(self, plugin_ctx):
+        corpora = await self.db.get(mk_list_key(plugin_ctx.user_id), [])
         if IMPLICIT_CORPUS not in corpora:
             corpora.append(IMPLICIT_CORPUS)
         return corpora

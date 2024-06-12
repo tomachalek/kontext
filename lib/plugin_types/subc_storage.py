@@ -33,6 +33,7 @@ from action.argmapping.subcorpus import (
     CreateSubcorpusArgs, CreateSubcorpusRawCQLArgs, CreateSubcorpusWithinArgs)
 from corplib.subcorpus import SubcorpusRecord
 from plugin_types.auth import UserInfo
+from action.plugin.ctx import AbstractBasePluginCtx
 
 
 class SubcArchiveException(Exception):
@@ -82,19 +83,28 @@ class AbstractSubcArchive(abc.ABC):
 
     @abc.abstractmethod
     async def create(
-            self, ident: str, author: UserInfo, size: int, public_description,
+            self,
+            plugin_ctx: Optional[AbstractBasePluginCtx],
+            ident: str,
+            author: UserInfo,
+            size: int,
+            public_description: str,
             data: Union[CreateSubcorpusRawCQLArgs, CreateSubcorpusWithinArgs, CreateSubcorpusArgs],
             is_draft: bool = False):
         """
         Create subcorpus in the database. It is assumed that actual subc. files are created somewhere else and
         the proper path is passed here. Also creates real subcorpus from draft.
+
+        If plugin_ctx is omitted, the method is expected to create its own db connection
+        (used e.g. when running on a bgcalc worker)
         """
 
-    async def create_preflight(self, subc_root_dir, corpname) -> str:
+    async def create_preflight(self, plugin_ctx: AbstractBasePluginCtx, subc_root_dir, corpname) -> str:
         """
         Create a preflight subcorpus with defined size (ignoring corpus structures etc.).
 
         Args:
+            plugin_ctx - a plugin ctx instance
             subc_root_dir -- a global root directory for all subcorpora
             corpname -- a source corpus ID
         """

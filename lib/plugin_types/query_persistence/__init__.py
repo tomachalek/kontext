@@ -32,12 +32,12 @@ else:
     from legacy.concordance import nop_upgrade_stored_record as upgrade_stored_record
 
 from action.argmapping.conc.base import ConcFormArgs
-from action.plugin.ctx import PluginCtx
+from action.plugin.ctx import AbstractUserPluginCtx
 from plugin_types.query_persistence.error import QueryPersistenceRecNotFound
 
 ConcFormArgsFactory = Callable[
     #   plugin_ctx, corpora,   data,         op_key, author_id
-    [PluginCtx, List[str], Dict[str, Any], str, int],
+    [AbstractUserPluginCtx, List[str], Dict[str, Any], str, int],
     Coroutine[Any, Any, ConcFormArgs]
 ]
 
@@ -87,7 +87,7 @@ class AbstractQueryPersistence(abc.ABC):
         """
 
     @abc.abstractmethod
-    async def open(self, data_id: str) -> Dict:
+    async def open(self, plugin_ctx: AbstractUserPluginCtx, data_id: str) -> Dict:
         """
         Load operation data according to the passed data_id argument.
         The data are assumed to be public (as are URL parameters of a query).
@@ -127,7 +127,7 @@ class AbstractQueryPersistence(abc.ABC):
         """
 
     @abc.abstractmethod
-    async def archive(self, user_id: int, conc_id: str, revoke: bool = False) -> Tuple[int, Dict[str, Any]]:
+    async def archive(self, plugin_ctx: AbstractUserPluginCtx, conc_id: str, revoke: bool = False) -> Tuple[int, Dict[str, Any]]:
         """
         Make the concordance record persistent. For implementations which
         archive concordances automatically this can be just an empty
@@ -138,7 +138,7 @@ class AbstractQueryPersistence(abc.ABC):
         the concordance identified by conc_id !!!
 
         arguments:
-        user_id -- user who wants to perform the operation
+        plugin_ctx -- plug-in ctx instance
         conc_id -- an identifier of the concordance
 
         returns:
@@ -217,7 +217,7 @@ class AbstractQueryPersistence(abc.ABC):
 
     async def _fix_forms(
             self,
-            plugin_ctx: PluginCtx,
+            plugin_ctx: AbstractUserPluginCtx,
             last_data: Dict[str, Any],
             ans: List[Dict[str, Any]],
             fn: Callable[[str, Dict], Awaitable[MapRes]]):
@@ -245,7 +245,7 @@ class AbstractQueryPersistence(abc.ABC):
 
     async def map_pipeline_ops(
             self,
-            plugin_ctx: PluginCtx,
+            plugin_ctx: AbstractUserPluginCtx,
             last_id: str,
             fn: Callable[[str, Dict], Awaitable[MapRes]]) -> List[MapRes]:
         """
@@ -283,7 +283,7 @@ class AbstractQueryPersistence(abc.ABC):
         return ans
 
     async def load_pipeline_ops(
-            self, plugin_ctx: PluginCtx, last_id: str,
+            self, plugin_ctx: AbstractUserPluginCtx, last_id: str,
             conc_form_args_factory: ConcFormArgsFactory) -> List[ConcFormArgs]:
         """
         Load all the operations which make up the current concordance
@@ -306,7 +306,7 @@ class AbstractQueryPersistence(abc.ABC):
 
     async def update_preflight_stats(
             self,
-            plugin_ctx: PluginCtx,
+            plugin_ctx: AbstractUserPluginCtx,
             preflight_id: str,
             corpus: str,
             subc_id: str,

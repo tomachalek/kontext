@@ -33,7 +33,7 @@ from plugin_types.subc_storage import AbstractSubcArchive, SubcArchiveException
 from plugins import inject
 from plugins.errors import PluginCompatibilityException
 from plugins.mysql_integration_db import MySqlIntegrationDb
-from pymysql.err import IntegrityError
+from mysql.connector.errors import IntegrityError
 from sanic import Sanic
 from util import AsyncBatchWriter
 
@@ -114,6 +114,7 @@ class MySQLSubcArchive(AbstractSubcArchive):
 
     async def create(
             self,
+            plugin_ctx,
             ident: str,
             author: UserInfo,
             size: int,
@@ -121,7 +122,8 @@ class MySQLSubcArchive(AbstractSubcArchive):
             data: Union[CreateSubcorpusRawCQLArgs, CreateSubcorpusWithinArgs, CreateSubcorpusArgs],
             is_draft: bool = False,
     ):
-        async with self._db.cursor() as cursor:
+        cursor_src = self._db.cursor_from_ctx(plugin_ctx) if plugin_ctx else self._db.cursor()
+        async with cursor_src as cursor:
             if isinstance(data, CreateSubcorpusRawCQLArgs):
                 column, value = 'cql', data.cql
             elif isinstance(data, CreateSubcorpusWithinArgs):
@@ -135,7 +137,6 @@ class MySQLSubcArchive(AbstractSubcArchive):
                     'VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)',
                     (ident, author['id'], author['id'], data.corpname, data.subcname, value, datetime.now(), public_description,
                      size, 1 if is_draft else 0, json.dumps(data.aligned_corpora) if data.aligned_corpora else ''))
-                await cursor.connection.commit()
             except IntegrityError as ex:
                 await cursor.execute(
                     f'SELECT is_draft FROM {self._bconf.subccorp_table} WHERE id = %s AND author_id = %s',
@@ -151,7 +152,7 @@ class MySQLSubcArchive(AbstractSubcArchive):
                 else:
                     raise ex
 
-    async def create_preflight(self, subc_root_dir, corpname):
+    async def create_preflight(self, plugin_ctx, subc_root_dir, corpname):
         """
         create a preflight subcorpus with fixed size, attached to a special
         user.
@@ -164,7 +165,7 @@ class MySQLSubcArchive(AbstractSubcArchive):
             await bw.write(struct.pack('<q', 0))
             await bw.write(struct.pack('<q', self.preflight_subcorpus_size))
         subcname = f'{corpname}-preflight'
-        async with self._db.cursor() as cursor:
+        async with self._db.cursor_from_ctx(plugin_ctx) as cursor:
             await cursor.execute('START TRANSACTION')
             # Due to caching etc. we always have to perform test whether a preflight subc. exists
             # (even if a consumer of this method tests it via corp_info.preflight_subcorpus, it may
@@ -257,7 +258,7 @@ class MySQLSubcArchive(AbstractSubcArchive):
 
         async with self._db.cursor() as cursor:
             await cursor.execute(sql, (user_id,))
-            return [row['corpus_name'] async for row in cursor]
+            return [row['corpus_name'] for row in await cursor.fetchall()]
 
     async def list(self, user_id, filter_args, corpname=None, offset=0, limit=None, include_drafts=False):
         if (filter_args.archived_only and filter_args.active_only) or \
@@ -306,7 +307,7 @@ class MySQLSubcArchive(AbstractSubcArchive):
             WHERE {" AND ".join(where)} ORDER BY t1.id LIMIT %s OFFSET %s"""
         async with self._db.cursor() as cursor:
             await cursor.execute(sql, args)
-            return [_subc_from_row(row) async for row in cursor]
+            return [_subc_from_row(row) for row in await cursor.fetchall()]
 
     async def get_info(self, subc_id: str) -> Optional[SubcorpusRecord]:
         async with self._db.cursor() as cursor:
@@ -352,7 +353,7 @@ class MySQLSubcArchive(AbstractSubcArchive):
                 f"SELECT id, name FROM {self._bconf.subccorp_table} WHERE id IN ({wc})",
                 tuple(subc_ids)
             )
-            async for row in cursor:
+            for row in await cursor.fetchall():
                 ans[row['id']] = row['name']
             return ans
 

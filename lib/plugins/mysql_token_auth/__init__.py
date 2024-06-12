@@ -27,7 +27,7 @@ from datetime import datetime
 from typing import List, Optional
 
 import plugins
-from action.plugin.ctx import PluginCtx
+from action.plugin.ctx import PluginCtx, AbstractUserPluginCtx
 from plugin_types.auth import (
     AbstractRemoteAuth, CorpusAccess, GetUserInfo, UserInfo)
 from plugins.mysql_integration_db import MySqlIntegrationDb
@@ -61,17 +61,17 @@ class TokenAuth(AbstractRemoteAuth):
     def is_administrator(self, user_id: int) -> bool:
         return False
 
-    async def corpus_access(self, user_dict: UserInfo, corpus_id: str) -> CorpusAccess:
-        corpora = await self._get_permitted_corpora(user_dict)
+    async def corpus_access(self, plugin_ctx, corpus_id):
+        corpora = await self._get_permitted_corpora(plugin_ctx)
         if corpus_id not in corpora:
             return CorpusAccess(False, False, '')
         return CorpusAccess(False, True, '')
 
-    async def permitted_corpora(self, user_dict: UserInfo) -> List[str]:
-        if self.is_anonymous(user_dict['id']):
+    async def permitted_corpora(self, plugin_ctx):
+        if self.is_anonymous(plugin_ctx.user_id):
             return []
         else:
-            return await self._get_permitted_corpora(user_dict)
+            return await self._get_permitted_corpora(plugin_ctx)
 
     async def get_user_info(self, plugin_ctx: PluginCtx) -> GetUserInfo:
         return {
@@ -124,13 +124,13 @@ class TokenAuth(AbstractRemoteAuth):
             email=data['email'],
             api_key=api_key)
 
-    async def _get_permitted_corpora(self, user_dict: UserInfo) -> List[str]:
-        async with self._db.cursor() as cursor:
+    async def _get_permitted_corpora(self, plugin_ctx: AbstractUserPluginCtx) -> List[str]:
+        async with self._db.cursor_from_ctx(plugin_ctx) as cursor:
             await cursor.execute('''
                 SELECT GROUP_CONCAT(corpus_name SEPARATOR ',') AS corpora
                 FROM kontext_api_token_corpus_access
                 WHERE token_value = %s AND user_id = %s
-            ''', (user_dict['api_key'], user_dict['id']))
+            ''', (plugin_ctx.user_dict['api_key'], plugin_ctx.user_dict['id']))
             data = await cursor.fetchone()
         return [] if data['corpora'] is None else list(data['corpora'].split(','))
 
